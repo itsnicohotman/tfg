@@ -1,0 +1,13 @@
+#Ignore folders
+Material_interesante/
+3D_Models/
+Memoria/
+mujoco/mujoco-3.3.2/
+mujoco/control/bin
+mujoco/control/include
+mujoco/control/lib
+mujoco/control/lib64
+mujoco/control/pyvenv.cfg
+mujoco/control/control/include/__pycache__/
+mujoco/control/control/src/__pycache__/
+mujoco/control/control/src/drone/__pycache__

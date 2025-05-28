@@ -1,0 +1,147 @@
+<!-- MuJoCo Aerial Manipulator GRVC, Alejandro Suarez asuarezfm@us.es -->
+
+<mujoco model="GRVC_Aerial_Manipulator_Nancy">
+
+  <!-- Specify angles in radians. Take inertia parameters from geometry, given body mass. -->
+  <compiler angle="radian" coordinate="local" inertiafromgeom="true"/>
+  
+  <!--Compiler options: integration method and time step -->
+  <option integrator="RK4" timestep="0.001" density="1.204" viscosity="1.8e-5" gravity="0 0 -9.8" />
+  
+  
+  
+  <asset>
+    <!-- Import the STL files with the geometry of the aerial manipulator.
+    	Check scale of the STL files to make sure units are correct (mm, m, inch). -->
+    <mesh name="Multirotor_X4_Base_mesh" file="Assets/Multirotor_X4_Base.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="Landing_Gear_Leg_mesh" file="Assets/Tube_Landing_Gear.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="Propeller_Blade_mesh" file="Assets/Propeller_Blade.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="Shoulder_Structure_mesh" file="Assets/Shoulder_Structure.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="Link_Upperarm_mesh" file="Assets/Link_Upperarm.stl" scale="0.001 0.001 0.001"/>
+    <mesh name="Link_Forearm_mesh" file="Assets/Link_Forearm.stl" scale="0.001 0.001 0.001"/>
+    
+    <!-- IMPORTANT NOTE: when generating the 3D model of each part of the robot,
+    	 it is convenient that the origin and drawing axis are located at the 
+    	 joint axes. This will simplify the construction of the model (below). -->
+    
+    <!-- Visual appearance of floor and sky -->  
+    <texture type="skybox" builtin="gradient" rgb1=".8 .8 .8" rgb2="0.25 0.5 0.85" width="12" height="12"/>
+    <texture name="grid" type="2d" builtin="checker" width="512" height="512" rgb1=".1 .2 .3" rgb2=".2 .3 .4"/>
+    <material name="grid" texture="grid" texrepeat="1 1" texuniform="true" reflectance=".25"/>
+    
+  </asset>
+  
+  
+  <worldbody>
+    <!-- Create the floor as a 20 by 20 m plane, 1 mm thickness -->
+    <geom name="floor" size="10 10 .001" type="plane" material="grid" condim="3"/>
+    
+    <light name="spotlight" mode="targetbodycom" target="Aerial_Manipulator" diffuse=".8 .8 .8" specular="0.3 0.3 0.3" pos="0 -6 4" cutoff="30"/>
+    <light name="top" pos="0 0 2" mode="trackcom"/>
+    
+    
+    <!-- Create hte robotic arm following a tree structure from the base link -->
+    <body name="Aerial_Manipulator" pos="0 0 1">
+      <!-- Create the geometry and set the physical properties of the manipulator base -->
+      <geom name="Multirotor_X4_Base_geom" type="mesh" mesh="Multirotor_X4_Base_mesh" rgba="0.6 0.8 0.8 1"/>
+      <joint name="q0" type="free" />
+      <inertial pos="0 0 0" mass="4.65"/>
+      
+      
+      <!-- Create the Landing Gear Legs -->
+      <body name="LandingGearLeg-1" pos="0.33835 -0.33835 -0.2">
+        <geom name="Landing_Gear_Leg_geom-1" type="mesh" mesh="Landing_Gear_Leg_mesh" rgba="0.5 0.75 0.75 1"/>
+        <inertial pos="0 0 0" mass="0.1"/>
+      </body>
+      <body name="LandingGearLeg-2" pos="0.33835 0.33835 -0.2">
+        <geom name="Landing_Gear_Leg_geom-2" type="mesh" mesh="Landing_Gear_Leg_mesh" rgba="0.5 0.75 0.75 1"/>
+        <inertial pos="0 0 0" mass="0.1"/>
+      </body>
+      <body name="LandingGearLeg-3" pos="-0.33835 0.33835 -0.2">
+        <geom name="Landing_Gear_Leg_geom-3" type="mesh" mesh="Landing_Gear_Leg_mesh" rgba="0.5 0.75 0.75 1"/>
+        <inertial pos="0 0 0" mass="0.1"/>
+      </body>
+      <body name="LandingGearLeg-4" pos="-0.33835 -0.33835 -0.2">
+        <geom name="Landing_Gear_Leg_geom-4" type="mesh" mesh="Landing_Gear_Leg_mesh" rgba="0.5 0.75 0.75 1"/>
+        <inertial pos="0 0 0" mass="0.1"/>
+      </body>
+      
+      
+      
+      <!-- Create the propellers -->
+      <body name="Propeller_Blade-1" pos="0.33835 -0.33835 0.065">
+        <geom name="Propeller_Blade_geom-1" type="mesh" mesh="Propeller_Blade_mesh" rgba="0.5 0.75 0.75 1"/>
+        <inertial pos="0 0 0" mass="0.01"/>
+        <joint name="propeller-1" type="hinge" axis="0 0 1" pos="0 0 0" damping="0.0005"/>
+      </body>
+      <body name="Propeller_Blade-2" pos="0.33835 0.33835 0.065">
+        <geom name="Propeller_Blade_geom-2" type="mesh" mesh="Propeller_Blade_mesh" rgba="0.5 0.75 0.75 1"/>
+        <inertial pos="0 0 0" mass="0.01"/>
+        <joint name="propeller-2" type="hinge" axis="0 0 1" pos="0 0 0" damping="0.0005"/>
+      </body>
+      <body name="Propeller_Blade-3" pos="-0.33835 0.33835 0.065">
+        <geom name="Propeller_Blade_geom-3" type="mesh" mesh="Propeller_Blade_mesh" rgba="0.5 0.75 0.75 1"/>
+        <inertial pos="0 0 0" mass="0.01"/>
+        <joint name="propeller-3" type="hinge" axis="0 0 1" pos="0 0 0" damping="0.0005"/>
+      </body>
+      <body name="Propeller_Blade-4" pos="-0.33835 -0.33835 0.065">
+        <geom name="Propeller_Blade_geom-4" type="mesh" mesh="Propeller_Blade_mesh" rgba="0.5 0.75 0.75 1"/>
+        <inertial pos="0 0 0" mass="0.01"/>
+        <joint name="propeller-4" type="hinge" axis="0 0 1" pos="0 0 0" damping="0.0005"/>
+      </body>
+      
+      
+      <!-- Create the Shoulder Structure -->
+      <body name="Shoulder_Structure" pos="0 0 -0.1">
+        <geom name="Shoulder_Structure_geom" type="mesh" mesh="Shoulder_Structure_mesh" rgba="0.5 0.75 0.75 1"/>
+        <inertial pos="0 0 0" mass="0.5"/>
+      </body>
+      
+      
+      <!-- Create the Left Arm Upperarm Link -->
+      <body name="Link_Upperarm_Left" pos="0 0.15 -0.1">
+        <joint name="q11" type="hinge" axis="0 1 0" pos="0 0 0" range="-1.57 1.57"/>
+        <geom name="Link_Upperarm_Left_geom" type="mesh" mesh="Link_Upperarm_mesh" rgba="0.5 0.75 0.75 1"/>
+        <inertial pos="0 0 0" mass="0.225"/>
+        
+        <!-- Create the Left Arm Forearm Link -->
+        <body name="Link_Forearm_Left" pos="0 0 -0.3">
+          <joint name="q12" type="hinge" axis="0 1 0" pos="0 0 0" range="-2.62 2.62"/>
+          <geom name="Link_Forearm_Left_geom" type="mesh" mesh="Link_Forearm_mesh" rgba="0.4 0.65 0.65 1"/>
+          <inertial pos="0 0 0" mass="0.1"/>
+        </body>
+      </body>
+      
+      
+      
+      <!-- Create the Right Arm Upperarm Link -->
+      <body name="Link_Upperarm_Right" pos="0 -0.15 -0.1">
+        <joint name="q21" type="hinge" axis="0 1 0" pos="0 0 0" range="-1.57 1.57"/>
+        <geom name="Link_Upperarm_Right_geom" type="mesh" mesh="Link_Upperarm_mesh" rgba="0.5 0.75 0.75 1"/>
+        <inertial pos="0 0 0" mass="0.225"/>
+        
+        <!-- Create the Left Arm Forearm Link -->
+        <body name="Link_Forearm_Right" pos="0 0 -0.3">
+          <joint name="q22" type="hinge" axis="0 1 0" pos="0 0 0" range="-2.62 2.62"/>
+          <geom name="Link_Forearm_Right_geom" type="mesh" mesh="Link_Forearm_mesh" rgba="0.4 0.65 0.65 1"/>
+          <inertial pos="0 0 0" mass="0.1"/>
+        </body>
+      </body>
+    </body>
+    
+    
+  </worldbody>
+  <actuator>
+    <motor name="propeller-1_motor" joint="propeller-1" gear="1" ctrlrange="-100 100" ctrllimited="true"/>
+    <motor name="propeller-2_motor" joint="propeller-2" gear="1" ctrlrange="-100 100" ctrllimited="true"/>
+    <motor name="propeller-3_motor" joint="propeller-3" gear="1" ctrlrange="-100 100" ctrllimited="true"/>
+    <motor name="propeller-4_motor" joint="propeller-4" gear="1" ctrlrange="-100 100" ctrllimited="true"/>
+    
+    <motor name="q11_motor" joint="q11" gear="100" ctrlrange="-1 1" ctrllimited="true"/>
+    <motor name="q12_motor" joint="q12" gear="100" ctrlrange="-1 1" ctrllimited="true"/>
+    <motor name="q21_motor" joint="q21" gear="100" ctrlrange="-1 1" ctrllimited="true"/>
+    <motor name="q22_motor" joint="q22" gear="100" ctrlrange="-1 1" ctrllimited="true"/>
+  </actuator>
+</mujoco>
+
+
