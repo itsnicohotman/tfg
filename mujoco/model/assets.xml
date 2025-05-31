@@ -1,0 +1,28 @@
+<mujoco>
+    <asset>
+        <!-- Import the STL files with the geometry of the robotic arm.
+            Check scale of the STL files to make sure units are correct (mm, m, inch). -->
+        <mesh name="Shoulder_Pitch_Structure_mesh" file="dualarm/Assets/Shoulder_Pitch_Structure.stl" scale="0.001 0.001 0.001"/>
+        <mesh name="Shoulder_Roll_Structure_Left_mesh" file="dualarm/Assets/Shoulder_Roll_Structure_Left.stl" scale="0.001 0.001 0.001"/>
+        <mesh name="Shoulder_Roll_Structure_Right_mesh" file="dualarm/Assets/Shoulder_Roll_Structure_Right.stl" scale="0.001 0.001 0.001"/>
+        <mesh name="Shoulder_Yaw_Structure_mesh" file="dualarm/Assets/Shoulder_Yaw_Structure.stl" scale="0.001 0.001 0.001"/>
+        <mesh name="Elbow_Pitch_Structure_Left_mesh" file="dualarm/Assets/Elbow_Pitch_Structure_Left.stl" scale="0.001 0.001 0.001"/>
+        <mesh name="Elbow_Pitch_Structure_Right_mesh" file="dualarm/Assets/Elbow_Pitch_Structure_Right.stl" scale="0.001 0.001 0.001"/>
+        <mesh name="Forearm_Link_with_Gripper_Servo_mesh" file="dualarm/Assets/Forearm_Link_with_Gripper_Servo.stl" scale="0.001 0.001 0.001"/>
+
+        <!-- Import the STL files with the geometry of the drone.
+            Check scale of the STL files to make sure units are correct (mm, m, inch). -->
+        <mesh name="Multirotor_X4_Base_mesh" file="drone/Assets/Multirotor_X4_Base.stl" scale="0.001 0.001 0.001"/>
+        <mesh name="Landing_Gear_Leg_mesh" file="drone/Assets/Tube_Landing_Gear.stl" scale="0.001 0.001 0.001"/>
+        <mesh name="Propeller_Blade_mesh" file="drone/Assets/Propeller_Blade.stl" scale="0.001 0.001 0.001"/>
+        <!-- IMPORTANT NOTE: when generating the 3D model of each part of the robot,
+            it is convenient that the origin and drawing axis are located at the 
+            joint axes. This will simplify the construction of the model (below). -->
+
+        <!-- Visual appearance of floor and sky -->  
+        <texture type="skybox" builtin="gradient" rgb1=".8 .8 .8" rgb2="0.25 0.5 0.85" width="12" height="12"/>
+        <texture name="grid" type="2d" builtin="checker" width="512" height="512" rgb1=".1 .2 .3" rgb2=".2 .3 .4"/>
+        <material name="grid" texture="grid" texrepeat="1 1" texuniform="true" reflectance=".25"/>
+
+    </asset>
+</mujoco>
