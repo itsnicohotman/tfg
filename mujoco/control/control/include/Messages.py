@@ -1,0 +1,32 @@
+from dataclasses import dataclass
+from typing import Optional, Tuple
+
+
+@dataclass
+class Command:
+    command: str
+    coordinates: Optional[Tuple[float, float, float]] = None
+
+
+@dataclass
+class ControlMessage:
+    grasp: bool  # True for grasping, False for releasing
+    referenceX: Optional[float]
+    referenceY: Optional[float]
+    referenceZ: Optional[float]
+
+
+@dataclass
+class SensorData:
+    timestamp: float  # Timestamp of the current simulation moment
+    timestep: float  # Simulation's timestep
+    sensorValues: (
+        dict  # Dictionary with sensor values: key=sensor's name, value=sensor's value
+    )
+    dronePosition: list[float, float, float]  # Drone's position
+    manipulatorPosition: list[float, float, float]  # Manipulator's position
+
+
+@dataclass
+class ControlAction:
+    droneThrusters: dict  # Dictionary with drone's control values: key=thruster name, value=action value

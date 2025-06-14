@@ -1,0 +1,241 @@
+import threading
+import queue
+import matplotlib.pyplot as plt
+import numpy as np
+from typing import List
+import os
+
+output_dir = "/home/nicolas/tfg/Memoria/Graficas"
+os.makedirs(output_dir, exist_ok=True)
+
+
+class DroneStabilityController(threading.Thread):
+    """PID controller for drone's attitude: roll, pitch and yaw."""
+
+    def __init__(
+        self,
+        shutdownEvent: threading.Event,
+        stabilityOrientationUpdateEvent: threading.Event,
+        stabilityResultEvent: threading.Event,
+        stabilityReferencesUpdateEvent: threading.Event,
+        pKp: List[float],  # [roll, pitch, yaw] attitude controller gain
+        pidKp: List[float],
+        pidKi: List[float],
+        pidKd: List[float],  # [roll, pitch, yaw] rate controller gains
+        orientationQueue: queue.Queue,
+        attitudeActionQueue: queue.Queue,
+        attitudeReferenceQueue: queue.Queue,
+    ):
+        super().__init__()
+        self._shutdownEvent = shutdownEvent
+        self._stabilityOrientationUpdateEvent = stabilityOrientationUpdateEvent
+        self._stabilityResultEvent = stabilityResultEvent
+        self._stabilityReferencesUpdateEvent = stabilityReferencesUpdateEvent
+        self._orientationQueue = orientationQueue
+        self._attitudeReferenceQueue = attitudeReferenceQueue
+        self._attitudeActionQueue = attitudeActionQueue
+        self._timestamp = 0.0
+        self._timestep = 0.001
+
+        # Angle -> Rate P Controller
+        self._pKp = np.array(pKp)
+
+        # Rate PID Controller
+        self._pidKp = np.array(pidKp)
+        self._pidKi = np.array(pidKi)
+        self._pidKd = np.array(pidKd)
+
+        # Attitude arrays
+        self._currentOrientation = np.array([0.0, 0.0, 0.0, 1.0])  # Quaternion
+        self._currentAngularVelocity = np.array([0.0, 0.0, 0.0])  # Gyroscope
+        self._previousTargetAngles = np.array(
+            [0.0, 0.0, 0.0]
+        )  # Roll, pitch, yaw (rad) --> normal range: [-0.52, 0.52] rad ~= [-30, 30] degrees
+        self._currentTargetAngles = np.array([0.5, 0.0, 0.0])  # Roll, pitch, yaw (rad)
+        self._previousEulerAngles = np.array([0.0, 0.0, 0.0])  # rad
+        self._unwrappedEulerAngles = np.array([0.0, 0.0, 0.0])  # rad
+
+        self._historyReferenceAngles = []
+        self._historyCurrentAngles = []
+        self._historyControlAction = []
+        self._historyRotorAdjustments = []
+        self._historyAngleError = []
+        self._historyRateError = []
+        self._historyTime = []
+
+    def run(self):
+        print("[DroneStabilityController] Initialized.")
+        previousTime = 0
+        previousRateError = np.zeros(3)
+        integralRateError = np.zeros(3)
+        iteration = 0
+
+        while not self._shutdownEvent.is_set():
+            iteration += 1
+            self.updateOrientation()
+            # self.updateReferences() Uncomment when coordinates controller is implemented --> new angle references will be sent
+            self._previousTargetAngles = np.array([0.0, 0.0, 0.0])
+
+            currentTime = self._timestamp
+            dt = currentTime - previousTime if previousTime > 0 else self._timestep
+            previousTime = currentTime
+
+            if iteration == 1 or iteration % 15 == 0:
+                # Attitude controller: P controller whose output is the target rate.
+                # Will execute with a frequency of f = 100 Hz (given that timestep = 0.001)
+
+                # Convert quaternion to Euler angles (roll, pitch, yaw) - in radians
+                currentAngles = np.array(
+                    self.quaternionToEuler(self._currentOrientation)
+                )
+                angleError = self._currentTargetAngles - currentAngles
+                targetRate = self._pKp * angleError
+
+            if iteration == 1 or iteration % 2 == 0:
+                # Rate controller: PID controller whose output is the torques to be applied.
+                # Will execute with a frequency of f = 500 Hz (given that timestep = 0.001)
+
+                rateError = targetRate - self._currentAngularVelocity
+                derivativeError = (rateError - previousRateError) / dt
+                integralRateError += rateError * dt
+                previousRateError = rateError
+
+                controlOutput = (
+                    self._pidKp * rateError
+                    + self._pidKi * integralRateError
+                    + self._pidKd * derivativeError
+                )
+
+            # Mixer for rotor forces based on roll/pitch/yaw adjustments
+            u_roll, u_pitch, u_yaw = controlOutput
+
+            rotorAdjustments = [
+                -u_pitch - u_roll - u_yaw,  # Rotor 1: front-left - CW
+                -u_pitch + u_roll + u_yaw,  # Rotor 2: front-right - CCW
+                +u_pitch + u_roll - u_yaw,  # Rotor 3: back-right - CW
+                +u_pitch - u_roll + u_yaw,  # Rotor 4: back-left - CCW
+            ]
+
+            # Send rotor adjustment values
+            self.sendRotorAdjustments(rotorAdjustments)
+
+            # Store for analysis
+            self._historyTime.append(currentTime)
+            self._historyAngleError.append(angleError.tolist())
+            self._historyRateError.append(rateError.tolist())
+            self._historyReferenceAngles.append(self._currentTargetAngles.tolist())
+            self._historyCurrentAngles.append(currentAngles.tolist())
+            self._historyRotorAdjustments.append(rotorAdjustments.copy())
+
+        self.graphErrors()
+
+    def updateOrientation(self):
+        self._stabilityOrientationUpdateEvent.wait()
+        try:
+            (
+                self._timestamp,
+                self._timestep,
+                self._currentOrientation,
+                self._currentAngularVelocity,
+            ) = self._orientationQueue.get(timeout=0.1)
+        except queue.Empty:
+            pass
+        finally:
+            self._stabilityOrientationUpdateEvent.clear()
+
+    def updateReferences(self):
+        # POTENTIAL IMPROVEMENT: Check if the intended references are valid (They must be in the [-0.52, 0.52] range)
+        self._stabilityReferencesUpdateEvent.wait()
+        try:
+            self._previousTargetAngles = self._currentTargetAngles
+            self._currentTargetAngles = self._attitudeReferenceQueue.get(timeout=0.1)
+        except queue.Empty:
+            pass
+        finally:
+            self._stabilityReferencesUpdateEvent.clear()
+
+    def sendRotorAdjustments(self, rotorAdjustments):
+        self._attitudeActionQueue.put(rotorAdjustments)
+        self._stabilityResultEvent.set()
+
+    def stop(self):
+        self._shutdownEvent.set()
+        self.graphErrors()
+
+    def graphErrors(self):
+
+        if not self._historyTime or not self._historyRotorAdjustments:
+            return
+
+        rateErrors = np.array(self._historyRateError)
+        angleErrors = np.array(self._historyAngleError)
+        time = np.array(self._historyTime)
+        labels = ["Roll", "Pitch", "Yaw"]
+
+        # --- Angle Error Plot ---
+        for i in range(3):
+            plt.plot(time, angleErrors[:, i], label=labels[i])
+        plt.title("Attitude Angle Control Error")
+        plt.xlabel("Time [s]")
+        plt.ylabel("Error [rad]")
+        plt.legend()
+        plt.savefig(os.path.join(output_dir, "AttitudeAngleControl_Errors.png"))
+
+        # --- Rate Error Plot ---
+        for i in range(3):
+            plt.plot(time, rateErrors[:, i], label=labels[i])
+        plt.title("Attitude Rate Control Error")
+        plt.xlabel("Time [s]")
+        plt.ylabel("Error [rad/s]")
+        plt.legend()
+        plt.savefig(os.path.join(output_dir, "AttitudeRateControl_Errors.png"))
+
+        reference_angles = np.array(self._historyReferenceAngles)
+        current_angles = np.array(self._historyCurrentAngles)
+
+        for i in range(3):
+            plt.figure()
+            plt.plot(time, reference_angles[:, i], "--", label=f"Ref {labels[i]}")
+            plt.plot(time, current_angles[:, i], label=f"Actual {labels[i]}")
+            plt.title(f"{labels[i]} Control")
+            plt.xlabel("Time [s]")
+            plt.ylabel("Angle [°]")
+            plt.legend()
+            plt.savefig(
+                os.path.join(output_dir, f"{labels[i]}Control_OnlyCables_WithWind.png")
+            )
+
+        roll_output = [v[0] for v in self._historyRotorAdjustments]
+        pitch_output = [v[1] for v in self._historyRotorAdjustments]
+        yaw_output = [v[2] for v in self._historyRotorAdjustments]
+
+        plt.figure()
+        plt.plot(self._historyTime, roll_output, label="Roll Output")
+        plt.plot(self._historyTime, pitch_output, label="Pitch Output")
+        plt.plot(self._historyTime, yaw_output, label="Yaw Output")
+        plt.xlabel("Time [s]")
+        plt.ylabel("Control Output")
+        plt.title("Control Output vs Time")
+        plt.grid(True)
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir, "ControlOutput.png"))
+        # plt.show()
+
+    @staticmethod
+    def quaternionToEuler(q):
+        # Convert quaternion to roll, pitch, yaw
+        w, x, y, z = q
+        t0 = +2.0 * (w * x + y * z)
+        t1 = +1.0 - 2.0 * (x * x + y * y)
+        roll = np.arctan2(t0, t1)
+
+        t2 = +2.0 * (w * y - z * x)
+        t2 = np.clip(t2, -1.0, 1.0)
+        pitch = np.arcsin(t2)
+
+        t3 = +2.0 * (w * z + x * y)
+        t4 = +1.0 - 2.0 * (y * y + z * z)
+        yaw = np.arctan2(t3, t4)
+
+        return roll, pitch, yaw

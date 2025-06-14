@@ -3,7 +3,7 @@
 <mujoco model="GRVC_Aerial_Manipulator_1Cable">
 
   <!-- Specify angles in radians. Take inertia parameters from geometry, given body mass. -->
-  <compiler angle="radian" coordinate="local" inertiafromgeom="false"/>
+  <compiler angle="radian" coordinate="local" inertiafromgeom="auto"/>
   
   <!--Compiler options: integration method and time step -->
   <option integrator="implicit" timestep="0.001" density="1.204" viscosity="1.8e-5" gravity="0 0 -9.8" wind="0 0 0"/>
@@ -25,67 +25,62 @@
     <!-- Create the floor as a 20 by 20 m plane, 1 mm thickness -->
     <geom name="floor" size="10 10 .001" type="plane" material="grid" condim="3"/> 
     
-    <!-- Create the robotic arm following a tree structure from the base link -->
     <body name="drone" pos="0 0 1">
       <!-- Create the geometry and set the physical properties of the manipulator base -->
       <site name="imu"/>
       <geom name="Multirotor_X4_Base_geom" type="mesh" mesh="Multirotor_X4_Base_mesh" rgba="0.6 0.8 0.8 1"/>
       <site name="Front" type="box" size="0.01 0.1 0.02" pos="0.15 0 0" rgba="1 0 0 1"/>
-<!--       <freejoint/>
- -->      <joint name="drone_roll" type="hinge" axis="1 0 0"/>
-      <!-- <joint name="drone_pitch" type="hinge" axis="0 1 0"/> -->
+      <!-- <freejoint/> -->
+      <!-- <joint name="drone_roll" type="hinge" axis="1 0 0"/> -->
+      <joint name="drone_pitch" type="hinge" axis="0 1 0"/>
       <!-- <joint name="drone_yaw" type="hinge" axis="0 0 1"/> -->
 
-      <inertial pos="0 0 0" mass="4.65"/>
-      <site pos="0 0 -0.2" rgba="1 0 0 1" size="0.01"/>
+      <inertial pos="0 0 0" mass="4.65" fullinertia="0.3045 0.2156 0.3945 1.5e-6 1e-15 1.38e-5"/>
+      <site pos="0 0 0" rgba="1 0 0 1" size="0.01"/>
       
       <!-- Create the Landing Gear Legs -->
       <body name="LandingGearLeg-1" pos="0.33835 -0.33835 -0.2">
         <geom name="Landing_Gear_Leg_geom-1" type="mesh" mesh="Landing_Gear_Leg_mesh" rgba="0.5 0.75 0.75 1"/>
-        <inertial pos="0 0 0" mass="0.05" diaginertia="1e-7 1e-7 1e-7"/>
       </body>
       <body name="LandingGearLeg-2" pos="0.33835 0.33835 -0.2">
         <geom name="Landing_Gear_Leg_geom-2" type="mesh" mesh="Landing_Gear_Leg_mesh" rgba="0.5 0.75 0.75 1"/>
-        <inertial pos="0 0 0" mass="0.05" diaginertia="1e-7 1e-7 1e-7"/>
       </body>
       <body name="LandingGearLeg-3" pos="-0.33835 0.33835 -0.2">
         <geom name="Landing_Gear_Leg_geom-3" type="mesh" mesh="Landing_Gear_Leg_mesh" rgba="0.5 0.75 0.75 1"/>
-        <inertial pos="0 0 0" mass="0.05" diaginertia="1e-7 1e-7 1e-7"/>
       </body>
       <body name="LandingGearLeg-4" pos="-0.33835 -0.33835 -0.2">
         <geom name="Landing_Gear_Leg_geom-4" type="mesh" mesh="Landing_Gear_Leg_mesh" rgba="0.5 0.75 0.75 1"/>
-        <inertial pos="0 0 0" mass="0.05" diaginertia="1e-7 1e-7 1e-7"/>
       </body>
       
       <!-- Create the propellers -->
       <body name="Propeller_Blade-1" pos="0.33835 -0.33835 0.065">
         <geom name="Propeller_Blade_geom-1" type="mesh" mesh="Propeller_Blade_mesh" rgba="0.5 0.75 0.75 1"/>
-        <inertial pos="0 0 0" mass="0.01" diaginertia="1e-8 1e-8 1e-8"/>
         <joint name="propeller-1" type="hinge" axis="0 0 1" pos="0 0 0" damping="0.0005"/>
+        <site name="propeller-1-site" pos="0 0 0"/>
       </body>
       <body name="Propeller_Blade-2" pos="0.33835 0.33835 0.065">
         <geom name="Propeller_Blade_geom-2" type="mesh" mesh="Propeller_Blade_mesh" rgba="0.5 0.75 0.75 1"/>
-        <inertial pos="0 0 0" mass="0.01" diaginertia="1e-8 1e-8 1e-8"/>
         <joint name="propeller-2" type="hinge" axis="0 0 1" pos="0 0 0" damping="0.0005"/>
+        <site name="propeller-2-site" pos="0 0 0"/>
       </body>
       <body name="Propeller_Blade-3" pos="-0.33835 0.33835 0.065">
         <geom name="Propeller_Blade_geom-3" type="mesh" mesh="Propeller_Blade_mesh" rgba="0.5 0.75 0.75 1"/>
-        <inertial pos="0 0 0" mass="0.01" diaginertia="1e-8 1e-8 1e-8"/>
         <joint name="propeller-3" type="hinge" axis="0 0 1" pos="0 0 0" damping="0.0005"/>
+        <site name="propeller-3-site" pos="0 0 0"/>
       </body>
       <body name="Propeller_Blade-4" pos="-0.33835 -0.33835 0.065">
         <geom name="Propeller_Blade_geom-4" type="mesh" mesh="Propeller_Blade_mesh" rgba="0.5 0.75 0.75 1"/>
-        <inertial pos="0 0 0" mass="0.01" diaginertia="1e-8 1e-8 1e-8"/>
         <joint name="propeller-4" type="hinge" axis="0 0 1" pos="0 0 0" damping="0.0005"/>
+        <site name="propeller-4-site" pos="0 0 0"/>
       </body>      
     </body>
   </worldbody>
  
   <actuator>
-    <motor name="propeller-1_motor" joint="propeller-1" gear="-1" ctrlrange="-50 50" ctrllimited="true"/>
-    <motor name="propeller-2_motor" joint="propeller-2" gear="1" ctrlrange="-50 50" ctrllimited="true"/>
-    <motor name="propeller-3_motor" joint="propeller-3" gear="-1" ctrlrange="-50 50" ctrllimited="true"/>
-    <motor name="propeller-4_motor" joint="propeller-4" gear="1" ctrlrange="-50 50" ctrllimited="true"/>
+    <motor name="propeller-1_motor" site="propeller-1-site" gear="0 0 1 0 0 -2" ctrlrange="-10 10" ctrllimited="true"/> <!-- CCW--> 
+    <motor name="propeller-2_motor" site="propeller-2-site" gear="0 0 1 0 0 2" ctrlrange="-10 10" ctrllimited="true"/> <!-- CW--> 
+    <motor name="propeller-3_motor" site="propeller-3-site" gear="0 0 1 0 0 -2" ctrlrange="-10 10" ctrllimited="true"/> <!-- CCW--> 
+    <motor name="propeller-4_motor" site="propeller-4-site" gear="0 0 1 0 0 2" ctrlrange="-10 10" ctrllimited="true"/> <!-- CW--> 
   </actuator>
 
   <sensor>
