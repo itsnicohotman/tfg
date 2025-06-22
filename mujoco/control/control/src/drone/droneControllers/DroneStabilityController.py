@@ -50,8 +50,11 @@ class DroneStabilityController(threading.Thread):
         self._currentAngularVelocity = np.array([0.0, 0.0, 0.0])  # Gyroscope
         self._previousTargetAngles = np.array(
             [0.0, 0.0, 0.0]
-        )  # Roll, pitch, yaw (rad) --> normal range: [-0.52, 0.52] rad ~= [-30, 30] degrees
-        self._currentTargetAngles = np.array([0.5, 0.0, 0.0])  # Roll, pitch, yaw (rad)
+        )  # Roll, pitch, yaw (rad):
+        # Normal range roll and pitch: [-0.52, 0.52] rad = ~[-30, 30] degrees
+        # Normal range yaw: [-3.1416, 3.1416] rad = ~[-180, 180] degrees
+
+        self._currentTargetAngles = np.array([0.0, 0.5, 0.0])  # Roll, pitch, yaw (rad)
         self._previousEulerAngles = np.array([0.0, 0.0, 0.0])  # rad
         self._unwrappedEulerAngles = np.array([0.0, 0.0, 0.0])  # rad
 
@@ -116,6 +119,13 @@ class DroneStabilityController(threading.Thread):
                 +u_pitch - u_roll + u_yaw,  # Rotor 4: back-left - CCW
             ]
 
+            """ rotorAdjustments = [
+                +u_pitch + u_roll - u_yaw,  # Rotor 1: front-left - CW
+                +u_pitch - u_roll + u_yaw,  # Rotor 2: front-right - CCW
+                -u_pitch - u_roll - u_yaw,  # Rotor 3: back-right - CW
+                -u_pitch + u_roll + u_yaw,  # Rotor 4: back-left - CCW
+            ] """
+
             # Send rotor adjustment values
             self.sendRotorAdjustments(rotorAdjustments)
 
@@ -144,7 +154,7 @@ class DroneStabilityController(threading.Thread):
             self._stabilityOrientationUpdateEvent.clear()
 
     def updateReferences(self):
-        # POTENTIAL IMPROVEMENT: Check if the intended references are valid (They must be in the [-0.52, 0.52] range)
+        # POTENTIAL IMPROVEMENT: Check if the intended references are valid (They must be in the corresponding normal range)
         self._stabilityReferencesUpdateEvent.wait()
         try:
             self._previousTargetAngles = self._currentTargetAngles
