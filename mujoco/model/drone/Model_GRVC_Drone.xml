@@ -33,7 +33,7 @@
       <!-- <freejoint/> -->
       <joint name="drone_roll" type="hinge" axis="1 0 0"/>
       <joint name="drone_pitch" type="hinge" axis="0 1 0"/>
-      <!-- <joint name="drone_yaw" type="hinge" axis="0 0 1"/> -->
+      <joint name="drone_yaw" type="hinge" axis="0 0 1"/>
 
       <inertial pos="0 0 0" mass="4.65" fullinertia="0.3045 0.2156 0.3945 1.5e-6 1e-15 1.38e-5"/>
       <site pos="0 0 0" rgba="1 0 0 1" size="0.01"/>

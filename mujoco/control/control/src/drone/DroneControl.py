@@ -56,9 +56,9 @@ class DroneControl(threading.Thread):
         self._orientationQueue = queue.Queue()
         self._attitudeReferenceQueue = queue.Queue()
         self._attitudeActionQueue = queue.Queue()
-        self._stabilityPKp = [10, 10, 0.0]  # Roll, Pitch, Yaw
-        self._stabilityPidKp = [15, 15, 0.0]
-        self._stabilityPidKi = [10, 10, 0.0]
+        self._stabilityPKp = [10, 10, 5]  # Roll, Pitch, Yaw
+        self._stabilityPidKp = [15, 15, 15]
+        self._stabilityPidKi = [10, 10, 15]
         self._stabilityPidKd = [0, 0.0, 0.0]
 
         self._stabilityController = DroneStabilityController(

@@ -54,7 +54,7 @@ class DroneStabilityController(threading.Thread):
         # Normal range roll and pitch: [-0.52, 0.52] rad = ~[-30, 30] degrees
         # Normal range yaw: [-3.1416, 3.1416] rad = ~[-180, 180] degrees
 
-        self._currentTargetAngles = np.array([0.0, 0.5, 0.0])  # Roll, pitch, yaw (rad)
+        self._currentTargetAngles = np.array([0.0, 0.0, 1.57])  # Roll, pitch, yaw (rad)
         self._previousEulerAngles = np.array([0.0, 0.0, 0.0])  # rad
         self._unwrappedEulerAngles = np.array([0.0, 0.0, 0.0])  # rad
 
