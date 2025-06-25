@@ -1,13 +1,14 @@
 import threading
 import queue
 import matplotlib.pyplot as plt
+import matplotlib
 import numpy as np
 from typing import List
 import os
 
 
 class DroneStabilityController(threading.Thread):
-    """PID controller for drone's attitude: roll, pitch and yaw."""
+    """Controller for drone's attitude: roll, pitch and yaw."""
 
     def __init__(
         self,
@@ -45,15 +46,10 @@ class DroneStabilityController(threading.Thread):
         # Attitude arrays
         self._currentOrientation = np.array([0.0, 0.0, 0.0, 1.0])  # Quaternion
         self._currentAngularVelocity = np.array([0.0, 0.0, 0.0])  # Gyroscope
-        self._previousTargetAngles = np.array(
-            [0.0, 0.0, 0.0]
-        )  # Roll, pitch, yaw (rad):
         # Normal range roll and pitch: [-0.52, 0.52] rad = ~[-30, 30] degrees
         # Normal range yaw: [-3.1416, 3.1416] rad = ~[-180, 180] degrees
 
-        self._currentTargetAngles = np.array(
-            [0.52, 0.52, 0.6]
-        )  # Roll, pitch, yaw (rad)
+        self._currentTargetAngles = np.array([0.0, 0.0, 0.0])  # Roll, pitch, yaw (rad)
         self._previousEulerAngles = np.array([0.0, 0.0, 0.0])  # rad
         self._unwrappedEulerAngles = np.array([0.0, 0.0, 0.0])  # rad
 
@@ -76,7 +72,6 @@ class DroneStabilityController(threading.Thread):
             iteration += 1
             self.updateOrientation()
             # self.updateReferences() Uncomment when coordinates controller is implemented --> new angle references will be sent
-            self._previousTargetAngles = np.array([0.0, 0.0, 0.0])
 
             currentTime = self._timestamp
             dt = currentTime - previousTime if previousTime > 0 else self._timestep
@@ -159,7 +154,6 @@ class DroneStabilityController(threading.Thread):
         # POTENTIAL IMPROVEMENT: Check if the intended references are valid (They must be in the corresponding normal range)
         self._stabilityReferencesUpdateEvent.wait()
         try:
-            self._previousTargetAngles = self._currentTargetAngles
             self._currentTargetAngles = self._attitudeReferenceQueue.get(timeout=0.1)
         except queue.Empty:
             pass
@@ -172,7 +166,8 @@ class DroneStabilityController(threading.Thread):
 
     def stop(self):
         self._shutdownEvent.set()
-        self.graphErrors()
+        print("[DroneStabilityController] Shutting Down.")
+        # self.graphErrors()
 
     def graphErrors(self):
         output_dir = "/home/nicolas/tfg/Memoria/GraficasAngulos"
@@ -194,6 +189,7 @@ class DroneStabilityController(threading.Thread):
         plt.ylabel("Error [rad]")
         plt.legend()
         plt.savefig(os.path.join(output_dir, "AttitudeAngleControl_Errors.png"))
+        print("[Drone Stability Controller] AttitudeAngleControl_Errors.png saved")
 
         # --- Rate Error Plot ---
         for i in range(3):
@@ -203,7 +199,7 @@ class DroneStabilityController(threading.Thread):
         plt.ylabel("Error [rad/s]")
         plt.legend()
         plt.savefig(os.path.join(output_dir, "AttitudeRateControl_Errors.png"))
-        print(f"[Stability Controller] Saved AttitudeControl_Erros.png")
+        print("[Drone Stability Controller] AttitudeRateControl_Errors.png saved")
 
         reference_angles = np.array(self._historyReferenceAngles)
         current_angles = np.array(self._historyCurrentAngles)
@@ -216,8 +212,12 @@ class DroneStabilityController(threading.Thread):
             plt.xlabel("Time [s]")
             plt.ylabel("Angle [°]")
             plt.legend()
-            plt.savefig(os.path.join(output_dir, f"{labels[i]}Control.png"))
-            print(f"[Stability Controller] Saved {labels[i]}Control.png")
+            plt.savefig(
+                os.path.join(output_dir, f"{labels[i]}Control_OnlyCables_WithWind.png")
+            )
+            print(
+                f"[Drone Stability Controller] {labels[i]}Control_OnlyCables_WithWind.png saved"
+            )
 
         roll_output = [v[0] for v in self._historyRotorAdjustments]
         pitch_output = [v[1] for v in self._historyRotorAdjustments]
@@ -234,8 +234,7 @@ class DroneStabilityController(threading.Thread):
         plt.legend()
         plt.tight_layout()
         plt.savefig(os.path.join(output_dir, "ControlOutput.png"))
-        print(f"[Stability Controller] Saved ControlOutput.png")
-        # plt.show()
+        print("[Drone Stability Controller] ControlOutput.png saved")
 
     @staticmethod
     def quaternionToEuler(q):
