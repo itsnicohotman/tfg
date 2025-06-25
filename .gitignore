@@ -13,3 +13,6 @@ mujoco/control/control/src/__pycache__/
 mujoco/control/control/src/drone/__pycache__
 .vscode/settings.json
 mujoco/control/control/src/drone/droneControllers/__pycache__
+mujoco/control/control/src/drone/simplePID.py
+.gitignore
+mujoco/control/control/include/classComms.py
