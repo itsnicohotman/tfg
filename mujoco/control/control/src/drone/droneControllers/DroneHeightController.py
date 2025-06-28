@@ -1,5 +1,4 @@
 import threading
-import queue
 import matplotlib.pyplot as plt
 import os
 import numpy as np
@@ -17,15 +16,17 @@ class DroneHeightController(threading.Thread):
         pidKi,
         pidKd,
         pKp,
-        heightQueue: queue.Queue,
-        heightActionQueue: queue.Queue,
+        heightData: dict,
+        heightLock: threading.Lock,
+        heightActionLock: threading.Lock,
     ):
         super().__init__()
         self._shutdownEvent = shutdownEvent
         self._heightControllerUpdateEvent = heightControllerUpdateEvent
         self._heightControllerResultsEvent = heightControllerResultsEvent
-        self._heightQueue = heightQueue
-        self._heightActionQueue = heightActionQueue
+        self._heightData = heightData
+        self._heightLock = heightLock
+        self._heightActionLock = heightActionLock
 
         # Controller
         self._pidKp = pidKp
@@ -34,6 +35,7 @@ class DroneHeightController(threading.Thread):
         self._pKp = pKp
         self.MAX_CONTROL_INPUT = 30
         self.MIN_CONTROL_INPUT = 0
+        self._rotorForce = 0.0
 
         self._currentTimestamp = 0.0
         self._timestep = 0.001
@@ -120,22 +122,22 @@ class DroneHeightController(threading.Thread):
 
     def updateHeightController(self):
         self._heightControllerUpdateEvent.wait()
-        try:
-            (
-                self._currentTimestamp,
-                self._currentHeight,
-                self._heightReference,
-                self._currentVelocity,
-            ) = self._heightQueue.get(timeout=0.1)
+        with self._heightLock:
+            self._currentTimestamp = self._heightData["timestamp"]
+            self._currentHeight = self._heightData["currentHeight"]
+            self._heightReference = self._heightData["heightReference"]
+            self._currentVelocity = self._heightData["currentVelocity"].copy()
             if self._heightReference < 0.45:
-                self._heightReference = 0.45  # Landing gear offset
-        except queue.Empty:
-            pass
+                self._heightReference = 0.45
         self._heightControllerUpdateEvent.clear()
 
     def sendHeightControllerResults(self, rotorForce):
-        self._heightActionQueue.put(rotorForce)
-        self._heightControllerResultsEvent.set()
+        while self._heightControllerResultsEvent.is_set():
+            continue
+        with self._heightActionLock:
+            self._rotorForce = rotorForce
+            print(f"Sending rotorForce (locked): {self._rotorForce}")
+            self._heightControllerResultsEvent.set()
 
     def graphControlProcess(self):
         output_dir = "/home/nicolas/tfg/Memoria/GraficasAltura"

@@ -1,5 +1,4 @@
 import threading
-import queue
 import matplotlib.pyplot as plt
 import matplotlib
 import numpy as np
@@ -19,30 +18,30 @@ class DroneStabilityController(threading.Thread):
         shutdownEvent: threading.Event,
         stabilityOrientationUpdateEvent: threading.Event,
         stabilityResultEvent: threading.Event,
-        stabilityReferencesUpdateEvent: threading.Event,
         pKp: List[float],  # [roll, pitch, yaw] attitude controller gain
         pidKp: List[float],
         pidKi: List[float],
         pidKd: List[float],  # [roll, pitch, yaw] rate controller gains
-        orientationQueue: queue.Queue,
-        attitudeActionQueue: queue.Queue,
-        attitudeReferenceQueue: queue.Queue,
+        stabilityLock: threading.Lock,
+        stabilityData: dict,
+        stabilityActionLock: threading.Lock,
+        rotorAdjustments: list,
     ):
         super().__init__()
         self._shutdownEvent = shutdownEvent
         self._stabilityOrientationUpdateEvent = stabilityOrientationUpdateEvent
         self._stabilityResultEvent = stabilityResultEvent
-        self._stabilityReferencesUpdateEvent = stabilityReferencesUpdateEvent
-        self._orientationQueue = orientationQueue
-        self._attitudeReferenceQueue = attitudeReferenceQueue
-        self._attitudeActionQueue = attitudeActionQueue
+        self._stabilityActionLock = stabilityActionLock
+        self._rotorAdjustments = rotorAdjustments
+        self._stabilityLock = stabilityLock
+        self._stabilityData = stabilityData
         self._timestamp = 0.0
         self._timestep = 0.001
 
         # Angle -> Rate P Controller
         self._pKp = np.array(pKp)
 
-        # Rate PID Controller
+        # Rate --> thrust PID Controller
         self._pidKp = np.array(pidKp)
         self._pidKi = np.array(pidKi)
         self._pidKd = np.array(pidKd)
@@ -75,7 +74,6 @@ class DroneStabilityController(threading.Thread):
         while not self._shutdownEvent.is_set():
             iteration += 1
             self.updateOrientation()
-            # self.updateReferences() Uncomment when coordinates controller is implemented --> new angle references will be sent
 
             currentTime = self._timestamp
             dt = currentTime - previousTime if previousTime > 0 else self._timestep
@@ -132,31 +130,26 @@ class DroneStabilityController(threading.Thread):
 
     def updateOrientation(self):
         self._stabilityOrientationUpdateEvent.wait()
-        try:
-            (
-                self._timestamp,
-                self._timestep,
-                self._currentOrientation,
-                self._currentAngularVelocity,
-            ) = self._orientationQueue.get(timeout=0.1)
-        except queue.Empty:
-            pass
-        finally:
-            self._stabilityOrientationUpdateEvent.clear()
-
-    def updateReferences(self):
-        # POTENTIAL IMPROVEMENT: Check if the intended references are valid (They must be in the corresponding normal range)
-        self._stabilityReferencesUpdateEvent.wait()
-        try:
-            self._currentTargetAngles = self._attitudeReferenceQueue.get(timeout=0.1)
-        except queue.Empty:
-            pass
-        finally:
-            self._stabilityReferencesUpdateEvent.clear()
+        with self._stabilityLock:
+            self._currentTimestamp = self._stabilityData["timestamp"]
+            self._timestep = self._stabilityData["timestep"]
+            self._currentOrientation = np.array(
+                self._stabilityData["currentOrientation"]
+            )
+            self._currentTargetAngles = np.array(
+                self._stabilityData["orientationReference"]
+            )
+            self._currentAngularVelocity = np.array(
+                self._stabilityData["currentAngularVelocity"]
+            )
+        self._stabilityOrientationUpdateEvent.clear()
 
     def sendRotorAdjustments(self, rotorAdjustments):
-        self._attitudeActionQueue.put(rotorAdjustments)
-        self._stabilityResultEvent.set()
+        while self._stabilityResultEvent.is_set():
+            continue
+        with self._stabilityActionLock:
+            self._rotorAdjustments = rotorAdjustments
+            self._stabilityResultEvent.set()
 
     def stop(self):
         self._shutdownEvent.set()
