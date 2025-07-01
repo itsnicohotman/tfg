@@ -11,17 +11,13 @@ os.makedirs(output_dir, exist_ok=True)
 
 
 class DroneStabilityController(threading.Thread):
-    """Controller for drone's attitude: roll, pitch and yaw."""
+    """Controller for drone's attitude: roll, pitch and yaw. Attitude controller at 100Hz."""
 
     def __init__(
         self,
         shutdownEvent: threading.Event,
         stabilityOrientationUpdateEvent: threading.Event,
         stabilityResultEvent: threading.Event,
-        pKp: List[float],  # [roll, pitch, yaw] attitude controller gain
-        pidKp: List[float],
-        pidKi: List[float],
-        pidKd: List[float],  # [roll, pitch, yaw] rate controller gains
         stabilityLock: threading.Lock,
         stabilityData: dict,
         stabilityActionLock: threading.Lock,
@@ -39,12 +35,14 @@ class DroneStabilityController(threading.Thread):
         self._timestep = 0.001
 
         # Angle -> Rate P Controller
-        self._pKp = np.array(pKp)
+        self._pKp = np.array(
+            [10, 10, 5]
+        )  #  # [roll, pitch, yaw] attitude controller gain
 
         # Rate --> thrust PID Controller
-        self._pidKp = np.array(pidKp)
-        self._pidKi = np.array(pidKi)
-        self._pidKd = np.array(pidKd)
+        self._pidKp = np.array([15, 15, 15])  # [roll, pitch, yaw] rate controller gains
+        self._pidKi = np.array([10, 10, 15])
+        self._pidKd = np.array([0.0, 0.0, 0.0])
 
         # Attitude arrays
         self._currentOrientation = np.array([0.0, 0.0, 0.0, 1.0])  # Quaternion
@@ -79,9 +77,9 @@ class DroneStabilityController(threading.Thread):
             dt = currentTime - previousTime if previousTime > 0 else self._timestep
             previousTime = currentTime
 
-            if iteration == 1 or iteration % 15 == 0:
+            if iteration == 1 or iteration % 4 == 0:
                 # Attitude controller: P controller whose output is the target rate.
-                # Will execute with a frequency of f = 100 Hz (given that timestep = 0.001)
+                # Will execute with a frequency of f = 250 Hz (given that timestep = 0.001)
 
                 # Convert quaternion to Euler angles (roll, pitch, yaw) - in radians
                 currentAngles = np.array(
@@ -90,20 +88,20 @@ class DroneStabilityController(threading.Thread):
                 angleError = self._currentTargetAngles - currentAngles
                 targetRate = self._pKp * angleError
 
-            if iteration == 1 or iteration % 2 == 0:
-                # Rate controller: PID controller whose output is the torques to be applied.
-                # Will execute with a frequency of f = 500 Hz (given that timestep = 0.001)
+            # if iteration == 1 or iteration % 2 == 0:
+            # Rate controller: PID controller whose output is the torques to be applied.
+            # Will execute with a frequency of f = 1000 Hz (given that timestep = 0.001)
 
-                rateError = targetRate - self._currentAngularVelocity
-                derivativeError = (rateError - previousRateError) / dt
-                integralRateError += rateError * dt
-                previousRateError = rateError
+            rateError = targetRate - self._currentAngularVelocity
+            derivativeError = (rateError - previousRateError) / dt
+            integralRateError += rateError * dt
+            previousRateError = rateError
 
-                controlOutput = (
-                    self._pidKp * rateError
-                    + self._pidKi * integralRateError
-                    + self._pidKd * derivativeError
-                )
+            controlOutput = (
+                self._pidKp * rateError
+                + self._pidKi * integralRateError
+                + self._pidKd * derivativeError
+            )
 
             # Mixer for rotor forces based on roll/pitch/yaw adjustments
             u_roll, u_pitch, u_yaw = controlOutput

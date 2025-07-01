@@ -12,10 +12,6 @@ class DroneHeightController(threading.Thread):
         shutdownEvent: threading.Event,
         heightControllerUpdateEvent: threading.Event,
         heightControllerResultsEvent: threading.Event,
-        pidKp,
-        pidKi,
-        pidKd,
-        pKp,
         heightData: dict,
         heightLock: threading.Lock,
         heightActionLock: threading.Lock,
@@ -29,10 +25,10 @@ class DroneHeightController(threading.Thread):
         self._heightActionLock = heightActionLock
 
         # Controller
-        self._pidKp = pidKp
-        self._pidKi = pidKi
-        self._pidKd = pidKd
-        self._pKp = pKp
+        self._pidKp = 25.0
+        self._pidKi = 20.0
+        self._pidKd = 0.0
+        self._pKp = 3.35
         self.MAX_CONTROL_INPUT = 30
         self.MIN_CONTROL_INPUT = 0
         self._rotorForce = 0.0

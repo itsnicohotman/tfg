@@ -3,6 +3,7 @@ import time
 import queue
 from src.drone.droneControllers.DroneHeightController import DroneHeightController
 from src.drone.droneControllers.DroneStabilityController import DroneStabilityController
+from src.drone.droneControllers.DroneCoordinatesController import CoordinatesController
 from include.Messages import ControlMessage, SensorData, ControlAction
 import numpy as np
 
@@ -38,18 +39,11 @@ class DroneControl(threading.Thread):
             "heightReference": 0.45,
             "currentVelocity": [0.0, 0.0, 0.0],
         }
-        self._heightPKp = 3.35
-        self._heightPidKp = 25.0
-        self._heightPidKi = 20.0
-        self._heightPidKd = 0.0
+
         self._heightController = DroneHeightController(
             self._shutdownEvent,
             self._heightControllerUpdateEvent,
             self._heightControllerResultsEvent,
-            self._heightPidKp,
-            self._heightPidKi,
-            self._heightPidKd,
-            self._heightPKp,
             self._heightData,
             self._heightLock,
             self._heightActionLock,
@@ -68,14 +62,10 @@ class DroneControl(threading.Thread):
             0.0,
             0.0,
         ]  # [Rotor1. Rotor2. Rotor3, Rotor4]
-        self._stabilityPKp = [10, 10, 5]  # Roll, Pitch, Yaw
-        self._stabilityPidKp = [15, 15, 15]
-        self._stabilityPidKi = [10, 10, 15]
-        self._stabilityPidKd = [0, 0.0, 0.0]
         self._stabilityLock = threading.Lock()
         self._stabilityData = {
             "timestamp": 0.0,
-            "timestep": 0.0,
+            "timestep": 0.001,
             "currentOrientation": [0.0, 0.0, 0.0, 0.0],
             "orientationReference": [0.0, 0.0, 0.0],  # Roll, pitch, yaw
             "currentAngularVelocity": [0.0, 0.0, 0.0],
@@ -85,16 +75,38 @@ class DroneControl(threading.Thread):
             self._shutdownEvent,
             self._stabilityUpdateEvent,
             self._stabilityResultEvent,
-            self._stabilityPKp,
-            self._stabilityPidKp,
-            self._stabilityPidKi,
-            self._stabilityPidKd,
             self._stabilityLock,
             self._stabilityData,
             self._stabilityActionLock,
             self._rotorAdjustments,
         )
         self._stabilityController.start()
+
+        # Coordinates Controller
+        self._coordinatesUpdateEvent = threading.Event()
+        self._coordinatesAnglesLock = threading.Lock()
+        self._coordinatesThrustLock = threading.Lock()
+        self._coordinatesLock = threading.Lock()
+        self._coordinatesData = {
+            "timestamp": 0.0,
+            "timestep": 0.001,
+            "currentPosition": [0.0, 0.0, 0.45],
+            "positionReference": [0.0, 0.0, 0.0],
+            "currentVelocity": [0.0, 0.0, 0.0],
+            "currentTargetVelocity": [0.0, 0.0, 0.0],
+            "currentAcceleration": [0.0, 0.0, 0.0],
+            "currentTargetAcceleration": [0.0, 0.0, 0.0],
+        }
+
+        self._coordinatesController = CoordinatesController(
+            self._shutdownEvent,
+            self._coordinatesUpdateEvent,
+            self._coordinatesLock,
+            self._coordinatesData,
+            self._coordinatesAnglesLock,
+            self._coordinatesThrustLock,
+        )
+        self._coordinatesController.start()
 
         self._sensorData = SensorData(
             timestamp=0.0,
@@ -124,33 +136,15 @@ class DroneControl(threading.Thread):
         self._currentTimestamp = 0.0
         self._timestep = 0.001
         self._previousTimestamp = 0.0
-        self._currentPosition = [0.0, 0.0, 0.0]
-        self._currentCOM = [0.0, 0.0, 0.0]
-        self._currentAcceleration = [0.0, 0.0, 0.0]
-        self._currentAngularVelocity = [0.0, 0.0, 0.0]
-        self._currentVelocity = [0.0, 0.0, 0.0]
-        self._currentOrientation = [0.0, 0.0, 0.0, 0.0]
-
-        # self._coordinatesController:DroneCoordinatesController
-        # self._coordinatesController.start()
-
-    def getControlMessage(self):
-        self._taskManagerManeuverEvent.wait()
-        try:
-            self._controlMessage = self._droneControlQueue.get(timeout=0.001)
-        except queue.Empty:
-            pass
-
-    def getSensorsData(self):
-        self._sendSensorsEvent.wait()
-        self._sensorData = self._sensorQueue.get(timeout=0.001)
-        self._sendSensorsEvent.clear()
-
-    def sendControlInputs(self):
-        while self._recvControlEvent.is_set():
-            continue
-        self._controlQueue.put(self._controlAction)
-        self._recvControlEvent.set()
+        self._currentPosition = np.zeros(3)
+        self._currentCOM = np.zeros(3)
+        self._currentAcceleration = np.zeros(3)
+        self._currentAngularVelocity = np.zeros(3)
+        self._currentVelocity = np.zeros(3)
+        self._currentOrientation = np.zeros(4)
+        self._currentTargetPosition = np.zeros(3)
+        self._currentTargetVelocity = np.zeros(3)
+        self._currentTargetAcceleration = np.zeros(3)
 
     def run(self):
         print("[DroneControl] Initialized.")
@@ -160,9 +154,10 @@ class DroneControl(threading.Thread):
             self.getSensorsData()
             self.updateCurrentState()
 
-            self.updateHeightController()
-            self.updateStabilityController()
             self.updateCoordinatesController()
+
+            # self.updateHeightController()
+            self.updateStabilityController()
             self.combineControllersOutputs()
             # self.checkReachedReferences()
 
@@ -176,20 +171,69 @@ class DroneControl(threading.Thread):
         self._heightController.join()
         self._stabilityController.stop()
         self._stabilityController.join()
-        # self._coordinatesController.stop()
-        # self._coordinatesController.join()
+        self._coordinatesController.stop()
+        self._coordinatesController.join()
         self._shutdownEvent.set()
+
+    def getControlMessage(self):
+        self._taskManagerManeuverEvent.wait()
+        try:
+            self._controlMessage = self._droneControlQueue.get(timeout=0.001)
+        except queue.Empty:
+            pass
+
+    def getSensorsData(self):
+        self._sendSensorsEvent.wait()
+        try:
+            self._sensorData = self._sensorQueue.get(timeout=0.001)
+        except queue.Empty:
+            pass
+        self._sendSensorsEvent.clear()
+
+    def sendControlInputs(self):
+        while self._recvControlEvent.is_set():
+            continue
+        self._controlQueue.put(self._controlAction)
+        self._recvControlEvent.set()
 
     def updateCurrentState(self):
         self._previousTimestamp = self._currentTimestamp
         self._currentTimestamp = self._sensorData.timestamp
         self._timestep = self._sensorData.timestep
-        self._currentPosition = self._sensorData.dronePosition
-        self._currentAcceleration = self._sensorData.sensorValues["body_linacc"]
-        self._currentAngularVelocity = self._sensorData.sensorValues["body_gyro"]
-        self._currentOrientation = self._sensorData.sensorValues["body_quat"]
-        self._currentCOM = self._sensorData.sensorValues["drone_load_com"]
-        self._currentVelocity = self._sensorData.sensorValues["body_vel"]
+        self._currentPosition = np.array(self._sensorData.dronePosition)
+        self._currentAcceleration = np.array(
+            self._sensorData.sensorValues["body_linacc"]
+        )
+        self._currentAngularVelocity = np.array(
+            self._sensorData.sensorValues["body_gyro"]
+        )
+        self._currentOrientation = np.array(self._sensorData.sensorValues["body_quat"])
+        self._currentCOM = np.array(self._sensorData.sensorValues["drone_load_com"])
+        self._currentVelocity = np.array(self._sensorData.sensorValues["body_vel"])
+        self._currentTargetPosition = np.array(
+            [
+                self._controlMessage.referenceX,
+                self._controlMessage.referenceY,
+                self._controlMessage.referenceZ,
+            ]
+        )
+        if self._currentTargetPosition[0] is None:
+            self._currentTargetPosition[0] = self._currentPosition[0]
+        if self._currentTargetPosition[1] is None:
+            self._currentTargetPosition[1] = self._currentPosition[1]
+        if self._currentTargetPosition[2] is None:
+            self._currentTargetPosition[2] = self._currentPosition[2]
+        # For the following, update Task Manager accordingly - or remove from updateCoordinatesController (probably most sensible option)
+        """ self._currentTargetVelocity = [
+            self._controlMessage.referenceVelocityX,
+            self._controlMessage.referenceVelocityY,
+            self._controlMessage.referenceVelocityZ,
+        ]
+        self._currentTargetAcceleration = [
+            self._controlMessage.referenceAccelerationX,
+            self._controlMessage.referenceAccelerationY,
+            self._controlMessage.referenceAccelerationZ,
+        ] """
 
     def updateHeightController(self):
         while self._heightControllerUpdateEvent.is_set():
@@ -218,11 +262,27 @@ class DroneControl(threading.Thread):
         self._stabilityUpdateEvent.set()
 
     def updateCoordinatesController(self):
-        pass
+        while self._coordinatesUpdateEvent.is_set():
+            continue
+        coordinatesData = {}
+        coordinatesData["timestamp"] = self._currentTimestamp
+        coordinatesData["timestep"] = self._timestep
+        coordinatesData["currentPosition"] = self._currentPosition.copy()
+        coordinatesData["positionReference"] = self._currentTargetPosition.copy()
+        coordinatesData["currentVelocity"] = self._currentVelocity.copy()
+        coordinatesData["currentTargetVelocity"] = [3.0, 3.0, 3.0]
+        # coordinatesData["currentTargetVelocity"] = self._currentTargetVelocity.copy()
+        coordinatesData["currentAcceleration"] = self._currentAcceleration.copy()
+        coordinatesData["currentTargetAcceleration"] = [5.0, 5.0, 5.0]
+        # coordinatesData["currentTargetAcceleration"] = (
+        #     self._currentTargetAcceleration.copy()
+        # )
+        self._coordinatesController.setCoordinatesData(coordinatesData)
+        self._coordinatesUpdateEvent.set()
 
     def combineControllersOutputs(self):
-        baseThrust = 0.0
-        baseThrust = self.getHeightControllerOutput()
+        baseThrust = self._coordinatesController.getBaseThrust()
+        # baseThrust = self.getHeightControllerOutput()
         stabilityRotorAdjustments = self.getStabilityControllerOutput()
         MAX_CONTROL_INPUT = 30
         MIN_CONTROL_INPUT = -30
