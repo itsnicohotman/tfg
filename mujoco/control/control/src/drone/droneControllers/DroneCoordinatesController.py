@@ -1,15 +1,10 @@
 import threading
 import matplotlib.pyplot as plt
-import matplotlib
 import numpy as np
 from typing import List
 import os
 
 from src.drone.droneControllers.TrajectoryPlanner import TrajectoryPlanner
-
-matplotlib.use("Agg")
-output_dir = "/home/nicolas/tfg/Memoria/GraficasPosicion"
-os.makedirs(output_dir, exist_ok=True)
 
 
 class CoordinatesController(threading.Thread):
@@ -33,8 +28,6 @@ class CoordinatesController(threading.Thread):
         self._coordinatesThrustLock = coordinatesThrustLock
         self._coordinatesLock = coordinatesLock
         self._coordinatesData = coordinatesData
-        self._timestamp = 0.0
-        self._timestep = 0.001
 
         # Position -> Velocity PID Controller
         pKp = 3.35
@@ -88,6 +81,7 @@ class CoordinatesController(threading.Thread):
         self._historyControlAction = []
         self._historyTime = []
         self._historyRefAngles = []
+        self._historyThrust = []
 
     def run(self):
         print("[DroneCoordinatesController] Initialized.")
@@ -98,19 +92,13 @@ class CoordinatesController(threading.Thread):
             iteration += 1
             self.updateMovementReference()
 
-            currentTime = self._timestamp
+            currentTime = self._currentTimestamp
             dt = currentTime - previousTime if previousTime > 0 else self._timestep
             previousTime = currentTime
 
             if iteration == 1 or iteration % 20 == 0:
                 # Coordinates controller: P controller whose output is the target velocity to the new position.
-                # Will execute with a frequency of f = 20 Hz (given that timestep = 0.001)
-                print(
-                    f"[COORDINATES CONTROLLER] type of _currentTargetPosition: {type(self._currentTargetPosition)}"
-                )
-                print(
-                    f"[COORDINATES CONTROLLER] type _currentPosition: {type(self._currentPosition)}"
-                )
+                # Will execute with a frequency of f = 50 Hz (given that timestep = 0.001)
                 errorPosition = self._currentTargetPosition - self._currentPosition
                 desiredVelocity = (
                     self._positionPID.compute(error=errorPosition, dt=dt)
@@ -154,13 +142,14 @@ class CoordinatesController(threading.Thread):
             )
             self._historyCurrentAcceleration.append(self._currentAcceleration.tolist())
             self._historyRefAngles.append(self._refAngles.tolist())
+            self._historyThrust.append(self._baseThrust)
 
         self.graphErrors()
 
     def stop(self):
         self._shutdownEvent.set()
         print("[DroneCoordinatesController] Shutting Down.")
-        # self.graphErrors()
+        self.graphErrors()
 
     def computeAttitudeAndThrust(self, desiredAcceleration, yawRef):
         # Unitary thrust vector
@@ -205,6 +194,8 @@ class CoordinatesController(threading.Thread):
             self._currentTargetAcceleration = np.array(
                 self._coordinatesData["currentTargetAcceleration"], dtype=np.float64
             )
+            self._currentTimestamp = self._coordinatesData["timestamp"]
+            self._timestep = self._coordinatesData["timestep"]
         self._coordinatesUpdateEvent.clear()
 
     # Accessed from DroneControl
@@ -223,68 +214,179 @@ class CoordinatesController(threading.Thread):
         return baseThrust
 
     def graphErrors(self):
-        if not self._historyTime or not self._historyRotorAdjustments:
+        if not self._historyTime:
             return
 
-        rateErrors = np.array(self._historyRateError)
-        angleErrors = np.array(self._historyAngleError)
+        self._historyCurrentPosition.append(self._currentPosition.tolist())
+        self._historyReferencePosition.append(self._currentTargetPosition.tolist())
+        self._historyReferenceVelocity.append(self._currentTargetVelocity.tolist())
+        self._historyReferenceAcceleration.append(
+            self._currentTargetAcceleration.tolist()
+        )
+        self._historyCurrentAcceleration.append(self._currentAcceleration.tolist())
+        self._historyRefAngles.append(self._refAngles.tolist())
+
+        output_dir = "/home/nicolas/tfg/Memoria/GraficasPosicion"
+        os.makedirs(output_dir, exist_ok=True)
+
+        # Coordinates graph
         time = np.array(self._historyTime)
-        labels = ["Roll", "Pitch", "Yaw"]
+        lengthTime = len(time)
+        historyPosition = np.array(self._historyCurrentPosition[:lengthTime])
+        historyPositionReference = np.array(self._historyReferencePosition[:lengthTime])
+        historyVelocity = np.array(self._historyCurrentVelocity[:lengthTime])
+        historyVelocityReference = np.array(self._historyReferenceVelocity[:lengthTime])
+        historyAcceleration = np.array(self._historyCurrentAcceleration[:lengthTime])
+        historyAccelerationReference = np.array(
+            self._historyReferenceAcceleration[:lengthTime]
+        )
+        historyPositionError = historyPositionReference - historyPosition
+        historyVelocityError = historyVelocityReference - historyVelocity
+        historyAccelerationError = historyAccelerationReference - historyAcceleration
+        """ lengthPosGraph = min(len(historyPositionReference), len(historyPosition))
+        lengthVelGraph = min(len(historyVelocityReference), len(historyVelocity))
+        lengthAccGraph = min(
+            len(historyAccelerationReference), len(historyAcceleration)
+        )
+        historyPositionError = (
+            historyPositionReference[:lengthPosGraph] - historyPosition[:lengthPosGraph]
+        )
+        historyVelocityError = (
+            historyVelocityReference[:lengthVelGraph] - historyVelocity[:lengthVelGraph]
+        )
+        historyAccelerationError = (
+            historyAccelerationReference[:lengthAccGraph]
+            - historyAcceleration[:lengthAccGraph]
+        ) """
+        historyRotorForce = np.array(self._historyThrust[:lengthTime])
+        labels = ["X", "Y", "Z"]
 
-        # --- Angle Error Plot ---
+        print(f"[COORDINATES CONTROLLER] Shapes: \n")
+        print(f"[COORDINATES CONTROLLER] time:{time.shape} \n")
+        print(f"time: {time}")
+        print(f"[COORDINATES CONTROLLER] Position:{historyPosition.shape} \n")
+        print(
+            f"[COORDINATES CONTROLLER] Position Ref:{historyPositionReference.shape} \n"
+        )
+        print(f"[COORDINATES CONTROLLER] Velocity:{historyVelocity.shape} \n")
+        print(
+            f"[COORDINATES CONTROLLER] Velocity Ref:{historyVelocityReference.shape} \n"
+        )
+        print(f"[COORDINATES CONTROLLER] Acceleration:{historyAcceleration.shape} \n")
+        print(
+            f"[COORDINATES CONTROLLER] Acceleration Ref:{historyAccelerationReference.shape} \n"
+        )
+        print(
+            f"[COORDINATES CONTROLLER] Position Error:{historyPositionError.shape} \n"
+        )
+        print(
+            f"[COORDINATES CONTROLLER] Velocity Error:{historyVelocityError.shape} \n"
+        )
+        print(
+            f"[COORDINATES CONTROLLER] Acceleration Error:{historyAccelerationError.shape} \n"
+        )
+
+        # Position error graph - dummy
         for i in range(3):
-            plt.plot(time, angleErrors[:, i], label=labels[i])
-        plt.title("Attitude Angle Control Error")
+            plt.plot(time, historyPositionError[:, i], label=labels[i])
+        plt.title("Position Control Error")
         plt.xlabel("Time [s]")
-        plt.ylabel("Error [rad]")
+        plt.ylabel("Error [m]")
         plt.legend()
-        plt.savefig(os.path.join(output_dir, "AttitudeAngleControl_Errors.png"))
-        print("[Drone Stability Controller] AttitudeAngleControl_Errors.png saved")
+        plt.savefig(os.path.join(output_dir, "Position_Errors_dummy.png"))
+        print("[Drone Coordinates Controller] Position_Errors_dummy.png saved")
 
-        # --- Rate Error Plot ---
+        # Position error graph
         for i in range(3):
-            plt.plot(time, rateErrors[:, i], label=labels[i])
-        plt.title("Attitude Rate Control Error")
+            plt.plot(time, historyPositionError[:, i], label=labels[i])
+        plt.title("Position Control Error")
         plt.xlabel("Time [s]")
-        plt.ylabel("Error [rad/s]")
+        plt.ylabel("Error [m]")
         plt.legend()
-        plt.savefig(os.path.join(output_dir, "AttitudeRateControl_Errors.png"))
-        print("[Drone Stability Controller] AttitudeRateControl_Errors.png saved")
+        plt.savefig(os.path.join(output_dir, "Position_Errors.png"))
+        print("[Drone Coordinates Controller] Position_Errors.png saved")
 
-        reference_angles = np.array(self._historyReferenceAngles)
-        current_angles = np.array(self._historyCurrentAngles)
+        # Velocity error graph
+        for i in range(3):
+            plt.plot(time, historyVelocityError[:, i], label=labels[i])
+        plt.title("Velocity Control Error")
+        plt.xlabel("Time [s]")
+        plt.ylabel("Error [m]")
+        plt.legend()
+        plt.savefig(os.path.join(output_dir, "Velocity_Errors.png"))
+        print("[Drone Coordinates Controller] Velocity_Errors.png saved")
 
+        # Acceleration error graph
+        for i in range(3):
+            plt.plot(time, historyAccelerationError[:, i], label=labels[i])
+        plt.title("Acceleration Control Error")
+        plt.xlabel("Time [s]")
+        plt.ylabel("Error [m]")
+        plt.legend()
+        plt.savefig(os.path.join(output_dir, "Acceleration_Errors.png"))
+        print("[Drone Coordinates Controller] Acceleration_Errors.png saved")
+
+        # Thrust graph
+        plt.figure()
+        plt.clf()
+        plt.plot(time, historyRotorForce, label="Rotor Force")
+        plt.title("Position Control - base thrust per rotor")
+        plt.xlabel("Time [s]")
+        plt.ylabel("Rotor Force [N]")
+        plt.legend()
+        plt.savefig(os.path.join(output_dir, "PositionControl_RotorForce.png"))
+        plt.close()
+        print("[Drone Coordinates Controller] PositionControl_RotorForce.png saved")
+
+        # Coordinate Position control
         for i in range(3):
             plt.figure()
-            plt.plot(time, reference_angles[:, i], "--", label=f"Ref {labels[i]}")
-            plt.plot(time, current_angles[:, i], label=f"Actual {labels[i]}")
-            plt.title(f"{labels[i]} Control")
+            plt.plot(
+                time, historyPositionReference[:, i], "--", label=f"Ref {labels[i]}"
+            )
+            plt.plot(time, historyPosition[:, i], label=f"Actual {labels[i]}")
+            plt.title(f"{labels[i]} Position Control")
             plt.xlabel("Time [s]")
-            plt.ylabel("Angle [°]")
+            plt.ylabel("Distance [m]")
+            plt.legend()
+            plt.savefig(os.path.join(output_dir, f"{labels[i]}_PositionControl.png"))
+            print(
+                f"[Drone Coordinates Controller] {labels[i]}_PositionControl.png saved"
+            )
+
+        # Coordinate Velocity control
+        for i in range(3):
+            plt.figure()
+            plt.plot(
+                time, historyVelocityReference[:, i], "--", label=f"Ref {labels[i]}"
+            )
+            plt.plot(time, historyVelocity[:, i], label=f"Actual {labels[i]}")
+            plt.title(f"{labels[i]} Velocity Control")
+            plt.xlabel("Time [s]")
+            plt.ylabel("Velocity [m/s]")
+            plt.legend()
+            plt.savefig(os.path.join(output_dir, f"{labels[i]}_VelocityControl.png"))
+            print(
+                f"[Drone Coordinates Controller] {labels[i]}_VelocityControl.png saved"
+            )
+
+        # Coordinate Acceleration control
+        for i in range(3):
+            plt.figure()
+            plt.plot(
+                time, historyAccelerationReference[:, i], "--", label=f"Ref {labels[i]}"
+            )
+            plt.plot(time, historyAcceleration[:, i], label=f"Actual {labels[i]}")
+            plt.title(f"{labels[i]} Acceleration Control")
+            plt.xlabel("Time [s]")
+            plt.ylabel("Acceleration [m/s]")
             plt.legend()
             plt.savefig(
-                os.path.join(output_dir, f"{labels[i]}Control_OnlyCables_WithWind.png")
+                os.path.join(output_dir, f"{labels[i]}_AccelerationControl.png")
             )
             print(
-                f"[Drone Stability Controller] {labels[i]}Control_OnlyCables_WithWind.png saved"
+                f"[Drone Coordinates Controller] {labels[i]}_AccelerationControl.png saved"
             )
-
-        roll_output = [v[0] for v in self._historyRotorAdjustments]
-        pitch_output = [v[1] for v in self._historyRotorAdjustments]
-        yaw_output = [v[2] for v in self._historyRotorAdjustments]
-
-        plt.figure()
-        plt.plot(self._historyTime, roll_output, label="Roll Output")
-        plt.plot(self._historyTime, pitch_output, label="Pitch Output")
-        plt.plot(self._historyTime, yaw_output, label="Yaw Output")
-        plt.xlabel("Time [s]")
-        plt.ylabel("Control Output")
-        plt.title("Control Output vs Time")
-        plt.grid(True)
-        plt.legend()
-        plt.tight_layout()
-        plt.savefig(os.path.join(output_dir, "ControlOutput.png"))
-        print("[Drone Stability Controller] ControlOutput.png saved")
 
 
 class PIDController:
