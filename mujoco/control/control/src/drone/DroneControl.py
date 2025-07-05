@@ -1,7 +1,8 @@
 import threading
 import time
 import queue
-from src.drone.droneControllers.DroneHeightController import DroneHeightController
+
+# from src.drone.droneControllers.DroneHeightController import DroneHeightController
 from src.drone.droneControllers.DroneStabilityController import DroneStabilityController
 from include.Messages import ControlMessage, SensorData, ControlAction
 import numpy as np
@@ -24,27 +25,27 @@ class DroneControl(threading.Thread):
         self._sendSensorsEvent = sendSensorsEvent
         self._recvControlEvent = recvControlEvent
 
-        # Height Controller
-        self._heightControllerUpdateEvent = threading.Event()
-        self._heightControllerResultsEvent = threading.Event()
-        self._heightControllerUpdateEvent.clear()
-        self._heightControllerResultsEvent.clear()
-        self._heightActionQueue = queue.Queue()
-        self._heightQueue = queue.Queue()
-        self._heightKp = 0.0  # 40 parece un buen valor para empezar a configurar el PID
-        self._heightKi = 0.0
-        self._heightKd = 0.0
-        self._heightController = DroneHeightController(
-            self._shutdownEvent,
-            self._heightControllerUpdateEvent,
-            self._heightControllerResultsEvent,
-            self._heightKp,
-            self._heightKi,
-            self._heightKd,
-            self._heightQueue,
-            self._heightActionQueue,
-        )
-        self._heightController.start()
+        ## Height Controller
+        # self._heightControllerUpdateEvent = threading.Event()
+        # self._heightControllerResultsEvent = threading.Event()
+        # self._heightControllerUpdateEvent.clear()
+        # self._heightControllerResultsEvent.clear()
+        # self._heightActionQueue = queue.Queue()
+        # self._heightQueue = queue.Queue()
+        # self._heightKp = 0.0  # 40 parece un buen valor para empezar a configurar el PID
+        # self._heightKi = 0.0
+        # self._heightKd = 0.0
+        # self._heightController = DroneHeightController(
+        #    self._shutdownEvent,
+        #    self._heightControllerUpdateEvent,
+        #    self._heightControllerResultsEvent,
+        #    self._heightKp,
+        #    self._heightKi,
+        #    self._heightKd,
+        #    self._heightQueue,
+        #    self._heightActionQueue,
+        # )
+        # self._heightController.start()
 
         # Stability Controller
         self._stabilityUpdateEvent = threading.Event()
@@ -56,9 +57,9 @@ class DroneControl(threading.Thread):
         self._orientationQueue = queue.Queue()
         self._attitudeReferenceQueue = queue.Queue()
         self._attitudeActionQueue = queue.Queue()
-        self._stabilityPKp = [10, 10, 5]  # Roll, Pitch, Yaw
-        self._stabilityPidKp = [15, 15, 15]
-        self._stabilityPidKi = [10, 10, 15]
+        self._stabilityPKp = [8, 10, 2.5]  # Roll, Pitch, Yaw
+        self._stabilityPidKp = [15, 15, 8]
+        self._stabilityPidKi = [10, 10, 30]
         self._stabilityPidKd = [0, 0.0, 0.0]
 
         self._stabilityController = DroneStabilityController(
@@ -156,8 +157,8 @@ class DroneControl(threading.Thread):
 
     def stop(self):
         print("[DroneControl] Shutting down.")
-        self._heightController.stop()
-        self._heightController.join()
+        # self._heightController.stop()
+        # self._heightController.join()
         self._stabilityController.stop()
         self._stabilityController.join()
         # self._coordinatesController.stop()
@@ -174,19 +175,19 @@ class DroneControl(threading.Thread):
         self._currentOrientation = self._sensorData.sensorValues["body_quat"]
         self._currentCOM = self._sensorData.sensorValues["drone_load_com"]
 
-    def updateHeightController(self):
-
-        while self._heightControllerUpdateEvent.is_set():
-            # print("[DroneControl] Waiting to update height Controller")
-            continue
-        # print("[DroneControl] Height Controller update sent.")
-        (timestamp, currentHeight, heightReference) = (
-            self._currentTimestamp,
-            self._currentPosition[2],
-            self._controlMessage.referenceZ,
-        )
-        self._heightQueue.put((timestamp, currentHeight, heightReference))
-        self._heightControllerUpdateEvent.set()
+    # def updateHeightController(self):
+    #
+    #    while self._heightControllerUpdateEvent.is_set():
+    #        # print("[DroneControl] Waiting to update height Controller")
+    #        continue
+    #    # print("[DroneControl] Height Controller update sent.")
+    #    (timestamp, currentHeight, heightReference) = (
+    #        self._currentTimestamp,
+    #        self._currentPosition[2],
+    #        self._controlMessage.referenceZ,
+    #    )
+    #    self._heightQueue.put((timestamp, currentHeight, heightReference))
+    #    self._heightControllerUpdateEvent.set()
 
     def updateStabilityController(self):
         while self._stabilityUpdateEvent.is_set():
@@ -265,16 +266,16 @@ class DroneControl(threading.Thread):
                 "[DroneControl] Reference position has been reached. Ready to execute a new command."
             )
 
-    def getHeightControllerOutput(self):
-        self._heightControllerResultsEvent.wait()
-        try:
-            thruster = self._heightActionQueue.get(timeout=0.1)
-        except queue.Empty:
-            pass
-        finally:
-            self._heightControllerResultsEvent.clear()
-
-        return thruster
+    # def getHeightControllerOutput(self):
+    #    self._heightControllerResultsEvent.wait()
+    #    try:
+    #        thruster = self._heightActionQueue.get(timeout=0.1)
+    #    except queue.Empty:
+    #        pass
+    #    finally:
+    #        self._heightControllerResultsEvent.clear()
+    #
+    #    return thruster
 
     def getStabilityControllerOutput(self):
         self._stabilityResultEvent.wait()
