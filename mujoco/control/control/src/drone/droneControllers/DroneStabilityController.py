@@ -5,9 +5,6 @@ import numpy as np
 from typing import List
 import os
 
-output_dir = "/home/nicolas/tfg/Memoria/Graficas"
-os.makedirs(output_dir, exist_ok=True)
-
 
 class DroneStabilityController(threading.Thread):
     """PID controller for drone's attitude: roll, pitch and yaw."""
@@ -54,7 +51,9 @@ class DroneStabilityController(threading.Thread):
         # Normal range roll and pitch: [-0.52, 0.52] rad = ~[-30, 30] degrees
         # Normal range yaw: [-3.1416, 3.1416] rad = ~[-180, 180] degrees
 
-        self._currentTargetAngles = np.array([0.0, 0.0, 1.57])  # Roll, pitch, yaw (rad)
+        self._currentTargetAngles = np.array(
+            [0.52, 0.52, 0.6]
+        )  # Roll, pitch, yaw (rad)
         self._previousEulerAngles = np.array([0.0, 0.0, 0.0])  # rad
         self._unwrappedEulerAngles = np.array([0.0, 0.0, 0.0])  # rad
 
@@ -112,12 +111,15 @@ class DroneStabilityController(threading.Thread):
             # Mixer for rotor forces based on roll/pitch/yaw adjustments
             u_roll, u_pitch, u_yaw = controlOutput
 
-            rotorAdjustments = [
-                -u_pitch - u_roll - u_yaw,  # Rotor 1: front-left - CW
-                -u_pitch + u_roll + u_yaw,  # Rotor 2: front-right - CCW
-                +u_pitch + u_roll - u_yaw,  # Rotor 3: back-right - CW
-                +u_pitch - u_roll + u_yaw,  # Rotor 4: back-left - CCW
-            ]
+            rotorAdjustments = np.array(
+                [
+                    -u_pitch - u_roll - u_yaw,  # Rotor 1: front-left - CW
+                    -u_pitch + u_roll + u_yaw,  # Rotor 2: front-right - CCW
+                    +u_pitch + u_roll - u_yaw,  # Rotor 3: back-right - CW
+                    +u_pitch - u_roll + u_yaw,  # Rotor 4: back-left - CCW
+                ]
+            )
+            rotorAdjustments = np.maximum(rotorAdjustments, 0)
 
             """ rotorAdjustments = [
                 +u_pitch + u_roll - u_yaw,  # Rotor 1: front-left - CW
@@ -173,6 +175,8 @@ class DroneStabilityController(threading.Thread):
         self.graphErrors()
 
     def graphErrors(self):
+        output_dir = "/home/nicolas/tfg/Memoria/GraficasAngulos"
+        os.makedirs(output_dir, exist_ok=True)
 
         if not self._historyTime or not self._historyRotorAdjustments:
             return
@@ -199,6 +203,7 @@ class DroneStabilityController(threading.Thread):
         plt.ylabel("Error [rad/s]")
         plt.legend()
         plt.savefig(os.path.join(output_dir, "AttitudeRateControl_Errors.png"))
+        print(f"[Stability Controller] Saved AttitudeControl_Erros.png")
 
         reference_angles = np.array(self._historyReferenceAngles)
         current_angles = np.array(self._historyCurrentAngles)
@@ -211,9 +216,8 @@ class DroneStabilityController(threading.Thread):
             plt.xlabel("Time [s]")
             plt.ylabel("Angle [°]")
             plt.legend()
-            plt.savefig(
-                os.path.join(output_dir, f"{labels[i]}Control_OnlyCables_WithWind.png")
-            )
+            plt.savefig(os.path.join(output_dir, f"{labels[i]}Control.png"))
+            print(f"[Stability Controller] Saved {labels[i]}Control.png")
 
         roll_output = [v[0] for v in self._historyRotorAdjustments]
         pitch_output = [v[1] for v in self._historyRotorAdjustments]
@@ -230,6 +234,7 @@ class DroneStabilityController(threading.Thread):
         plt.legend()
         plt.tight_layout()
         plt.savefig(os.path.join(output_dir, "ControlOutput.png"))
+        print(f"[Stability Controller] Saved ControlOutput.png")
         # plt.show()
 
     @staticmethod
