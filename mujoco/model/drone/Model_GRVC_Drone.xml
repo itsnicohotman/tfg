@@ -25,7 +25,7 @@
     <!-- Create the floor as a 20 by 20 m plane, 1 mm thickness -->
     <geom name="floor" size="10 10 .001" type="plane" material="grid" condim="3"/> 
     
-    <body name="drone" pos="0 0 0.55">
+    <body name="drone" pos="0 0 0.45">
       <!-- Create the geometry and set the physical properties of the manipulator base -->
       <site name="imu"/>
       <geom name="Multirotor_X4_Base_geom" type="mesh" mesh="Multirotor_X4_Base_mesh" rgba="0.6 0.8 0.8 1"/>
