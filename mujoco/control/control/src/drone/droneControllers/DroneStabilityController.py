@@ -52,7 +52,7 @@ class DroneStabilityController(threading.Thread):
         # Normal range yaw: [-3.1416, 3.1416] rad = ~[-180, 180] degrees
 
         self._currentTargetAngles = np.array(
-            [0.52, 0.52, 0.6]
+            [0.52, 0.22, 0.6]
         )  # Roll, pitch, yaw (rad)
         self._previousEulerAngles = np.array([0.0, 0.0, 0.0])  # rad
         self._unwrappedEulerAngles = np.array([0.0, 0.0, 0.0])  # rad
@@ -187,6 +187,8 @@ class DroneStabilityController(threading.Thread):
         labels = ["Roll", "Pitch", "Yaw"]
 
         # --- Angle Error Plot ---
+        plt.figure()
+        plt.clf()
         for i in range(3):
             plt.plot(time, angleErrors[:, i], label=labels[i])
         plt.title("Attitude Angle Control Error")
@@ -196,6 +198,8 @@ class DroneStabilityController(threading.Thread):
         plt.savefig(os.path.join(output_dir, "AttitudeAngleControl_Errors.png"))
 
         # --- Rate Error Plot ---
+        plt.figure()
+        plt.clf()
         for i in range(3):
             plt.plot(time, rateErrors[:, i], label=labels[i])
         plt.title("Attitude Rate Control Error")
@@ -210,6 +214,7 @@ class DroneStabilityController(threading.Thread):
 
         for i in range(3):
             plt.figure()
+            plt.clf()
             plt.plot(time, reference_angles[:, i], "--", label=f"Ref {labels[i]}")
             plt.plot(time, current_angles[:, i], label=f"Actual {labels[i]}")
             plt.title(f"{labels[i]} Control")
