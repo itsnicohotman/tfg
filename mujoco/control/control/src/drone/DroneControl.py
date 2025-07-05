@@ -32,9 +32,9 @@ class DroneControl(threading.Thread):
         self._heightControllerResultsEvent.clear()
         self._heightActionQueue = queue.Queue()
         self._heightQueue = queue.Queue()
-        self._heightPKp = 9.0
-        self._heightPidKp = 30.0
-        self._heightPidKi = 25.0
+        self._heightPKp = 3.35
+        self._heightPidKp = 25.0
+        self._heightPidKi = 20.0
         self._heightPidKd = 0.0
         self._heightController = DroneHeightController(
             self._shutdownEvent,
@@ -120,13 +120,13 @@ class DroneControl(threading.Thread):
     def getControlMessage(self):
         self._taskManagerManeuverEvent.wait()
         try:
-            self._controlMessage = self._droneControlQueue.get(timeout=0.1)
+            self._controlMessage = self._droneControlQueue.get(timeout=0.0001)
         except queue.Empty:
             pass
 
     def getSensorsData(self):
         self._sendSensorsEvent.wait()
-        self._sensorData = self._sensorQueue.get(timeout=0.1)
+        self._sensorData = self._sensorQueue.get(timeout=0.0001)
         self._sendSensorsEvent.clear()
 
     def sendControlInputs(self):
@@ -139,7 +139,7 @@ class DroneControl(threading.Thread):
         print("[DroneControl] Initialized.")
 
         while not self._shutdownEvent.is_set():
-            # self.getControlMessage()
+            self.getControlMessage()
             self.getSensorsData()
             self.updateCurrentState()
 
@@ -266,7 +266,7 @@ class DroneControl(threading.Thread):
     def getHeightControllerOutput(self):
         self._heightControllerResultsEvent.wait()
         try:
-            thruster = self._heightActionQueue.get(timeout=0.1)
+            thruster = self._heightActionQueue.get(timeout=0.0001)
         except queue.Empty:
             pass
         finally:
@@ -276,7 +276,7 @@ class DroneControl(threading.Thread):
     def getStabilityControllerOutput(self):
         self._stabilityResultEvent.wait()
         try:
-            stabilityRotorAdjustments = self._attitudeActionQueue.get(timeout=0.1)
+            stabilityRotorAdjustments = self._attitudeActionQueue.get(timeout=0.0001)
         except queue.Empty:
             stabilityRotorAdjustments = [0.0, 0.0, 0.0, 0.0]
         finally:
