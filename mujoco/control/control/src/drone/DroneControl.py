@@ -141,12 +141,12 @@ class DroneControl(threading.Thread):
             self.getSensorsData()
             self.updateCurrentState()
 
-            # self.updateCoordinatesController()
+            self.updateCoordinatesController()
 
             self.updateHeightController()
             self.updateStabilityController()
             self.combineControllersOutputs()
-            self.checkReachedReferences()
+            # self.checkReachedReferences()
 
             self.sendControlInputs()
 
@@ -223,7 +223,7 @@ class DroneControl(threading.Thread):
         heightData["timestamp"] = self._currentTimestamp
         heightData["currentHeight"] = self._currentPosition[2]
         heightData["heightReference"] = (
-            self._controlMessage.referenceZ  # o 3 si lo prefieres
+            3  # self._controlMessage.referenceZ  o 3 si lo prefieres
         )
         heightData["currentVelocity"] = self._currentVelocity.copy()
         self._heightController.setHeightData(heightData)
@@ -238,7 +238,10 @@ class DroneControl(threading.Thread):
             self._stabilityData["currentOrientation"] = self._currentOrientation
             self._stabilityData["orientationReference"] = (
                 self._coordinatesController.getAttitudeReference().copy()
-            )  # or self._orientationReference.copy() when coordinates controller is added
+            )
+            self._stabilityData["currentAngularVelocity"] = (
+                self._currentAngularVelocity.copy()
+            )
         self._stabilityUpdateEvent.set()
 
     def updateCoordinatesController(self):
@@ -250,7 +253,7 @@ class DroneControl(threading.Thread):
         coordinatesData["currentPosition"] = self._currentPosition.copy()
         coordinatesData["positionReference"] = self._currentTargetPosition.copy()
         coordinatesData["currentVelocity"] = self._currentVelocity.copy()
-        coordinatesData["currentTargetVelocity"] = [2.0, 2.0, 2.0]
+        coordinatesData["currentTargetVelocity"] = [1.0, 1.0, 1.0]
         # coordinatesData["currentTargetVelocity"] = self._currentTargetVelocity.copy()
         coordinatesData["currentAcceleration"] = self._currentAcceleration.copy()
         coordinatesData["currentOrientation"] = self._currentOrientation.copy()
@@ -262,9 +265,13 @@ class DroneControl(threading.Thread):
     def combineControllersOutputs(self):
         # baseThrust = self._coordinatesController.getBaseThrust()
         baseThrust = self._heightController.getRotorForce()
-        stabilityRotorAdjustments = self.getStabilityControllerOutput()
-        MAX_CONTROL_INPUT = 30
-        MIN_CONTROL_INPUT = -30
+        # print(f"[DroneControl] Base Thrust: {baseThrust}")
+        # stabilityRotorAdjustments = self.getStabilityControllerOutput()
+        stabilityRotorAdjustments = self._stabilityController.getRotorAdjustments()
+        # print(f"[DroneControl] Stability Adjustments: {stabilityRotorAdjustments}")
+
+        MAX_CONTROL_INPUT = 40
+        MIN_CONTROL_INPUT = 0
 
         thrust1 = max(
             min(baseThrust + stabilityRotorAdjustments[0], MAX_CONTROL_INPUT),
