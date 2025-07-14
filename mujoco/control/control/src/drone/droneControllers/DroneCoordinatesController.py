@@ -1,8 +1,8 @@
 import threading
 import matplotlib.pyplot as plt
 import numpy as np
-from typing import List
 import os
+import time
 
 from src.drone.droneControllers.TrajectoryPlanner import TrajectoryPlanner
 from src.drone.droneControllers.DroneStabilityController import DroneStabilityController
@@ -26,7 +26,7 @@ class CoordinatesController(threading.Thread):
         super().__init__()
         self._shutdownEvent = shutdownEvent
         self._coordinatesUpdateEvent = coordinatesUpdateEvent
-        self._coordinatesAnglesLock = coordinatesAnglesLock
+        self._coordinatesResultsLock = coordinatesAnglesLock
         # self._coordinatesThrustLock = coordinatesThrustLock
         self._coordinatesLock = coordinatesLock
         self._coordinatesData = coordinatesData
@@ -57,6 +57,16 @@ class CoordinatesController(threading.Thread):
             kd=vKd,
             outputLimit=self._MAX_ACCEL,
         )
+
+        # Check if the height reference has been reached
+        self._stabilityTime = (
+            0.5  # Time in seconds to consider the height reference as reached
+        )
+        self._errorTolerance = 0.01  # Tolerance for height and velocity errors
+        self._previousHeightReference = 0.0
+        self._positionReferenceChanged = False
+        self._reachedReference = False
+        self._inToleranceSince = None
 
         # Inputs
         self._currentTimestamp = 0.0
@@ -103,8 +113,8 @@ class CoordinatesController(threading.Thread):
                 targetVelocity = np.zeros(3)
                 # Coordinates controller: P controller whose output is the target velocity to the new position.
                 # Will execute with a frequency of f = 50 Hz (given that timestep = 0.001)
-                print(f"[COORD CONTR] Current Position: {self._currentPosition}")
-                print(f"[COORD CONTR] Target Position: {self._currentTargetPosition}")
+                # print(f"[COORD CONTR] Current Position: {self._currentPosition}")
+                # print(f"[COORD CONTR] Target Position: {self._currentTargetPosition}")
                 errorPosition = self._currentTargetPosition - self._currentPosition
                 mask = np.abs(errorPosition) > 0.1
                 targetVelocity[mask] = self._currentTargetVelocity[mask] * np.sign(
@@ -115,7 +125,7 @@ class CoordinatesController(threading.Thread):
                     self._positionPID.compute(error=errorPosition, dt=dt)
                     + targetVelocity
                 )
-                print(f"[COORD CONTR] Desired Velocity: {desiredVelocity}")
+                # print(f"[COORD CONTR] Desired Velocity: {desiredVelocity}")
 
                 # Velocity controller: P controller whose output is the target acceleration.
                 # Will execute with a frequency of f = 50 Hz (given that timestep = 0.001)
@@ -123,7 +133,7 @@ class CoordinatesController(threading.Thread):
                 desiredAcceleration = np.array(
                     self._velocityPID.compute(error=errorVelocity, dt=dt)
                 )
-                print(f"[COORD CONTR] Desired Acceleration: {desiredAcceleration}")
+                # print(f"[COORD CONTR] Desired Acceleration: {desiredAcceleration}")
 
                 # if iteration == 1 or iteration % 10 == 0:
                 # Acceleration controller: PID controller whose output are the reference Euler angles for the stability controller
@@ -132,11 +142,23 @@ class CoordinatesController(threading.Thread):
                 referenceEulerAngles = self.computeAttitudeAndThrust(
                     desiredAcceleration=desiredAcceleration
                 )
-                with self._coordinatesAnglesLock:
-                    self._refAngles = np.array(referenceEulerAngles)
 
-                if iteration % 10 == 0:
-                    print(f"[COORD CONTR] Ref. Angles: {referenceEulerAngles}")
+                reachedReference = self.checkReachedReferences(
+                    positionError=errorPosition[:2],
+                    velocityError=errorVelocity[:2],
+                )
+
+                with self._coordinatesResultsLock:
+                    self._refAngles = np.array(referenceEulerAngles)
+                    self._reachedReference = reachedReference
+
+                if iteration % 10 == 0 and reachedReference:
+                    print(
+                        "[DroneCoordinatesController] Position reference reached and stable."
+                    )
+
+                """ if iteration % 10 == 0:
+                    print(f"[COORD CONTR] Ref. Angles: {referenceEulerAngles}") """
 
                 # with self._coordinatesThrustLock:
                 #    self._baseThrust = thrust
@@ -174,7 +196,7 @@ class CoordinatesController(threading.Thread):
                 yaw += 2 * np.pi"""
         # Calculate the reference angles (roll, pitch, yaw) based on the desired acceleration
         MAX_ROLL = 0.52  # 30 degrees in radians
-        MAX_PITCH = 0.52  # 30 degrees in
+        MAX_PITCH = 0.52  # 30 degrees in radians
         gravity = 9.81
         # print(f"[COORD CONTR] Desired Acceleration: {desiredAcceleration}")
         """ desiredAcceleration = np.concatenate(
@@ -259,14 +281,51 @@ class CoordinatesController(threading.Thread):
         self._coordinatesUpdateEvent.clear()
 
     # Accessed from DroneControl
+    def checkReachedReferences(self, positionError, velocityError):
+        """Check if the target position has been reached."""
+        reachedReference = False
+        xPositionError = positionError[0]
+        xVelocityError = velocityError[0]
+        yPositionError = positionError[1]
+        yVelocityError = velocityError[1]
+
+        if self._positionReferenceChanged:
+            self._positionReferenceChanged = False
+            reachedReference = False
+            self._inToleranceSince = None
+            print(
+                "[DroneCoordinatesController] Position reference changed, resetting check."
+            )
+        else:
+            if (
+                abs(xPositionError) < self._errorTolerance
+                and abs(xVelocityError) < self._errorTolerance
+                and abs(yPositionError) < self._errorTolerance
+                and abs(yVelocityError) < self._errorTolerance
+            ):
+                if self._inToleranceSince is None:
+                    self._inToleranceSince = time.time()
+                elif (time.time() - self._inToleranceSince) >= self._stabilityTime:
+                    reachedReference = True
+                    """ print(
+                        "[DroneCoordinatesController] Position reference reached and stable."
+                    ) """
+            else:
+                self._inToleranceSince = None
+        return reachedReference
+
     def setCoordinatesData(self, coordinatesData):
         with self._coordinatesLock:
             self._coordinatesData = coordinatesData
 
     def getAttitudeReference(self):
-        with self._coordinatesAnglesLock:
+        with self._coordinatesResultsLock:
             referenceEulerAngles = self._refAngles
         return referenceEulerAngles
+
+    def getReachedReference(self):
+        with self._coordinatesResultsLock:
+            return self._reachedReference
 
     # def getBaseThrust(self):
     #    with self._coordinatesThrustLock:
