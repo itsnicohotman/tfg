@@ -123,6 +123,9 @@ class DroneHeightController(threading.Thread):
                 self._rotorForce = rotorForce
                 self._reachedReference = reachedReference
 
+            if iteration % 100 == 0 and reachedReference:
+                print("[DroneHeightController] Height reference reached and stable.")
+
             # Store for analysis
             self._historyHeightReference.append(self._heightReference)
             self._historyCurrentHeight.append(self._currentHeight)

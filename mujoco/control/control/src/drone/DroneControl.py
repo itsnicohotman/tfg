@@ -117,7 +117,7 @@ class DroneControl(threading.Thread):
         self._controlQueue = controlQueue  # sends to MuJoCo Simulation Thread
 
         self._lastCheckTime = None
-        self._reachedReference = False
+        self._reachedReferences = False
         self._toleranceThreshold = 0.01
         self._stabilityTime = 2
 
@@ -146,7 +146,7 @@ class DroneControl(threading.Thread):
             self.updateHeightController()
             self.updateStabilityController()
             self.combineControllersOutputs()
-            # self.checkReachedReferences()
+            self.checkReachedReferences()
 
             self.sendControlInputs()
 
@@ -300,9 +300,13 @@ class DroneControl(threading.Thread):
     def checkReachedReferences(self):
         heightReferenceReached = self._heightController.getReachedReference()
         # print(f"[DroneControl] Height reference reached: {heightReferenceReached}")
-        self._reachedReference = heightReferenceReached
-        if self._reachedReference:
-            print("[DroneControl] Height reference has been reached.")
+        positionReferenceReached = self._coordinatesController.getReachedReference()
+        # print(f"[DroneControl] Position reference reached: {positionReferenceReached}")
+        self._reachedReferences = heightReferenceReached and positionReferenceReached
+        if self._reachedReferences:
+            print(
+                "[DroneControl] Height reference and position reference have been reached."
+            )
             self._taskManagerManeuverEvent.clear()
 
     def getStabilityControllerOutput(self):
