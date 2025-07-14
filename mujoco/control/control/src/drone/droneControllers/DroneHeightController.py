@@ -28,6 +28,8 @@ class DroneHeightController(threading.Thread):
         self.MIN_CONTROL_INPUT = 0
         self._rotorForce = 0.0  # Base thrust to be applied to the rotors
 
+        # AHORA HAY QUE PROBAR LA SIMULACIÓN EMPEZANDO DESDE EL SUELO Y SUBIENDO A 3 METROS CON GCS. DESPUÉS PROBAR A IR A UNA POSICIÓN Y MANTENERLA.
+
         # Check if the height reference has been reached
         self._stabilityTime = (
             0.5  # Time in seconds to consider the height reference as reached
@@ -176,9 +178,9 @@ class DroneHeightController(threading.Thread):
                     self._inToleranceSince = time.time()
                 elif (time.time() - self._inToleranceSince) >= self._stabilityTime:
                     reachedReference = True
-                    print(
+                    """ print(
                         "[DroneHeightController] Height reference reached and stable."
-                    )
+                    ) """
             else:
                 self._inToleranceSince = None
         return reachedReference

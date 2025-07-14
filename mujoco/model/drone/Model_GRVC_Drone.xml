@@ -33,8 +33,9 @@
       <site name="Y axis" type="cylinder" size="0.025 0.1" euler="1.57 0 0" pos="0 0.15 0" rgba="0 1 0 1"/>
       <site name="Z axis" type="cylinder" size="0.025 0.1" pos="0 0 0.15" rgba="0 0 1 1"/>
       <!-- <freejoint/> -->
-      <!-- <joint name="drone_x_translation" type="slide" axis="1 0 0" damping="0.01" pos="0 0 0"/>
-      <joint name="drone_y_translation" type="slide" axis="0 1 0" damping="0.01" pos="0 0 0"/> -->
+      <joint name="drone_x_translation" type="slide" axis="1 0 0" damping="0.01" pos="0 0 0"/>
+      <joint name="drone_y_translation" type="slide" axis="0 1 0" damping="0.01" pos="0 0 0"/>
+      <!-- <joint name="drone_z_translation" type="slide" axis="0 0 1" damping="0.01" pos="0 0 0"/> -->
       <joint name="yaw" type="hinge" axis="1 0 0" damping="0.01" pos="0 0 0"/>
       <joint name="pitch" type="hinge" axis="0 1 0" damping="0.01" pos="0 0 0"/>
       <joint name="roll" type="hinge" axis="0 0 1" damping="0.01" pos="0 0 0"/>
