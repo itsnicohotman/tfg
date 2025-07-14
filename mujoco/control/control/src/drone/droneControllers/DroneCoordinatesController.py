@@ -32,9 +32,10 @@ class CoordinatesController(threading.Thread):
         self._coordinatesData = coordinatesData
 
         # Position -> Velocity PID Controller
-        pKp = 5.0
-        pKi = 0.0
-        pKd = 0.0
+        pKp = np.array([3, 3, 0.0], dtype=np.float64)  # Kp for x, y [3 3 0]
+        pKi = np.array([2.3, 2.3, 0.0], dtype=np.float64)  # Ki for x, y [2.3 2.3 0]
+        pKd = np.array([0.05, 0.05, 0.0], dtype=np.float64)  # Kd for x, y [0.05 0.05 0]
+        # ZIEGLER-NICHOLS: Pitch: Kc = 4, Tc = 2 --> PID: Kp = 0.59Kc, Ki = 1.18*Kc/Tc, Kd = 0.075KcTc
         self._MAX_VEL = 1.0
         self._positionPID = PIDController(
             kp=pKp,
@@ -44,9 +45,11 @@ class CoordinatesController(threading.Thread):
         )
 
         # Velocity -> Acceleration PID Controller
-        vKp = 5.0
-        vKi = 0.0
-        vKd = 0.0
+        vKp = np.array([4, 4, 0.0], dtype=np.float64)  # Kp for x, y velocities [4 4 0]
+        vKi = np.array([5, 5, 0.0], dtype=np.float64)  # Ki for x, y velocities [5 5 0]
+        vKd = np.array(
+            [0.0085, 0.0085, 0.0], dtype=np.float64
+        )  # Kd for x, y velocities [0.0085 0.0085 0]
         self._MAX_ACCEL = 2.0
         self._velocityPID = PIDController(
             kp=vKp,
@@ -438,7 +441,7 @@ class CoordinatesController(threading.Thread):
 
 
 class PIDController:
-    def __init__(self, kp, ki, kd, outputLimit):
+    def __init__(self, kp: np.array, ki: np.array, kd: np.array, outputLimit):
         self._kp = kp
         self._ki = ki
         self._kd = kd
