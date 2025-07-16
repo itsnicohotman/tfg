@@ -215,17 +215,11 @@ class DroneControl(threading.Thread):
         while self._heightControllerUpdateEvent.is_set():
             continue
         heightData = {
-            "timestamp": 0.0,
-            "currentHeight": 0.0,
-            "heightReference": 0.45,
-            "currentVelocity": [0.0, 0.0, 0.0],
+            "timestamp": self._currentTimestamp,
+            "currentHeight": self._currentPosition[2],
+            "heightReference": 3,  # self._controlMessage.referenceZ  o 3 si lo prefieres
+            "currentVelocity": self._currentVelocity.copy(),
         }
-        heightData["timestamp"] = self._currentTimestamp
-        heightData["currentHeight"] = self._currentPosition[2]
-        heightData["heightReference"] = (
-            3  # self._controlMessage.referenceZ  o 3 si lo prefieres
-        )
-        heightData["currentVelocity"] = self._currentVelocity.copy()
         self._heightController.setHeightData(heightData)
         self._heightControllerUpdateEvent.set()
 
