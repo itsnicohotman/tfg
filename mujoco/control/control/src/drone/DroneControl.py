@@ -38,16 +38,8 @@ class DroneControl(threading.Thread):
 
         # Stability Controller
         self._stabilityUpdateEvent = threading.Event()
-        self._stabilityResultEvent = threading.Event()
         self._stabilityUpdateEvent.clear()
-        self._stabilityResultEvent.clear()
         self._stabilityActionLock = threading.Lock()
-        self._rotorAdjustments = [
-            0.0,
-            0.0,
-            0.0,
-            0.0,
-        ]  # [Rotor1. Rotor2. Rotor3, Rotor4]
         self._stabilityLock = threading.Lock()
         self._stabilityData = {
             "timestamp": 0.0,
@@ -60,11 +52,9 @@ class DroneControl(threading.Thread):
         self._stabilityController = DroneStabilityController(
             self._shutdownEvent,
             self._stabilityUpdateEvent,
-            self._stabilityResultEvent,
             self._stabilityLock,
             self._stabilityData,
             self._stabilityActionLock,
-            self._rotorAdjustments,
         )
         self._stabilityController.start()
 
@@ -260,7 +250,6 @@ class DroneControl(threading.Thread):
         # baseThrust = self._coordinatesController.getBaseThrust()
         baseThrust = self._heightController.getRotorForce()
         # print(f"[DroneControl] Base Thrust: {baseThrust}")
-        # stabilityRotorAdjustments = self.getStabilityControllerOutput()
         stabilityRotorAdjustments = self._stabilityController.getRotorAdjustments()
         # print(f"[DroneControl] Stability Adjustments: {stabilityRotorAdjustments}")
 
@@ -302,10 +291,3 @@ class DroneControl(threading.Thread):
                 "[DroneControl] Height reference and position reference have been reached."
             )
             self._taskManagerManeuverEvent.clear()
-
-    def getStabilityControllerOutput(self):
-        self._stabilityResultEvent.wait()
-        with self._stabilityActionLock:
-            stabilityRotorAdjustments = self._rotorAdjustments
-            self._stabilityResultEvent.clear()
-        return stabilityRotorAdjustments
