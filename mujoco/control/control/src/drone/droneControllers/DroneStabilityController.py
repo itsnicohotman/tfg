@@ -13,21 +13,17 @@ class DroneStabilityController(threading.Thread):
         self,
         shutdownEvent: threading.Event,
         stabilityOrientationUpdateEvent: threading.Event,
-        stabilityResultEvent: threading.Event,
         stabilityLock: threading.Lock,
         stabilityData: dict,
         stabilityActionLock: threading.Lock,
-        rotorAdjustments: list,
     ):
         super().__init__()
         self._shutdownEvent = shutdownEvent
         self._stabilityOrientationUpdateEvent = stabilityOrientationUpdateEvent
-        self._stabilityResultEvent = stabilityResultEvent
         self._stabilityActionLock = stabilityActionLock
-        self._rotorAdjustments = rotorAdjustments
         self._stabilityLock = stabilityLock
         self._stabilityData = stabilityData
-        self._timestamp = 0.0
+        self._currentTimestamp = 0.0
         self._timestep = 0.001
 
         # Angle -> Rate P Controller
@@ -47,8 +43,9 @@ class DroneStabilityController(threading.Thread):
         # Normal range yaw: [-3.1416, 3.1416] rad = ~[-180, 180] degrees
 
         self._currentTargetAngles = np.zeros(3)  # Roll, pitch, yaw (rad)
-        self._previousEulerAngles = np.zeros(3)  # rad
-        self._unwrappedEulerAngles = np.zeros(3)  # rad
+
+        # Outputs
+        self._rotorAdjustments = [0.0, 0.0, 0.0, 0.0]  # Adjustments for each rotor
 
         self._historyReferenceAngles = []
         self._historyCurrentAngles = []
@@ -60,44 +57,55 @@ class DroneStabilityController(threading.Thread):
         self._historyRate = []
         self._historyTime = []
 
+        self._debugging = False  # Set to False to disable debugging output
+
     def run(self):
         print("[DroneStabilityController] Initialized.")
-        previousTime = 0
+        previousTimePID = 0
+        previousTimeP = 0
         previousRateError = np.zeros(3)
         integralRateError = np.zeros(3)
         iteration = 0
+        dtPID = 0.001
+        dtP = 0.004
 
         while not self._shutdownEvent.is_set():
-            iteration += 1
+            debug = self._debugging and iteration % 100 == 0
             self.updateOrientation()
-
-            currentTime = self._timestamp
-            dt = currentTime - previousTime if previousTime > 0 else self._timestep
-            previousTime = currentTime
 
             if iteration == 1 or iteration % 4 == 0:
                 # Attitude controller: P controller whose output is the target rate.
-                # Will execute with a frequency of f = 250 Hz (given that timestep = 0.001)
+                # Will execute with a frequency of f = 250 Hz (given that timestep = 0.001). Therefore, dtP = 0.004.
 
+                dtP = self._currentTimestamp - previousTimeP
+                previousTimeP = self._currentTimestamp
                 # Convert quaternion to Euler angles (roll, pitch, yaw) - in radians
                 currentAngles = np.array(
                     self.quaternionToEuler(self._currentOrientation)
                 )
                 angleError = self._currentTargetAngles - currentAngles
                 targetRate = self._pKp * angleError
+            if debug:
+                print(
+                    f"[DroneStabilityController] iteration: {iteration}, current timestamp: {self._currentTimestamp}"
+                )
+                print(
+                    f"[DroneStabilityController] currentAngles: {currentAngles}, current target angles: {self._currentTargetAngles},angleError: {angleError}"
+                )
+                print(
+                    f"[DroneStabilityController] currentAngularVelocity: {self._currentAngularVelocity}, targetRate: {targetRate}"
+                )
+                print(f"[DroneStabilityController] dtP: {dtP}")
 
-            # if iteration == 1 or iteration % 2 == 0:
             # Rate controller: PID controller whose output is the torques to be applied.
-            # Will execute with a frequency of f = 1000 Hz (given that timestep = 0.001)
+            # Will execute with a frequency of f = 1000 Hz (given that timestep = 0.001). Therefore, dtPID = 0.001.
 
-            """ print(
-                f"[DroneStabilityController] currentAngularVelocity: {self._currentAngularVelocity}"
-            ) """
             rateError = targetRate - self._currentAngularVelocity
-            derivativeError = (rateError - previousRateError) / dt
-            integralRateError += rateError * dt
+            derivativeError = (rateError - previousRateError) / dtPID
+            integralRateError += rateError * dtPID
             previousRateError = rateError
-
+            dtPID = self._currentTimestamp - previousTimePID
+            previousTimePID = self._currentTimestamp
             controlOutput = (
                 self._pidKp * rateError
                 + self._pidKi * integralRateError
@@ -112,15 +120,21 @@ class DroneStabilityController(threading.Thread):
                 +u_pitch + u_roll - u_yaw,  # Rotor 3: back-right - CW
                 +u_pitch - u_roll + u_yaw,  # Rotor 4: back-left - CCW
             ]
+            if debug:
+                print(f"[DroneStabilityController] rate error: {rateError}")
+                print(
+                    f"[DroneStabilityController] [u_roll, u_pitch, u_yaw]: {controlOutput}"
+                )
+                print(
+                    f"[DroneStabilityController] rotorAdjustments: {rotorAdjustments}"
+                )
+                print(f"[DroneStabilityController] dtPID: {dtPID}")
 
             with self._stabilityActionLock:
                 self._rotorAdjustments = rotorAdjustments
 
-            # Send rotor adjustment values
-            # self.sendRotorAdjustments(rotorAdjustments)
-
             # Store for analysis
-            self._historyTime.append(currentTime)
+            self._historyTime.append(self._currentTimestamp)
             self._historyAngleError.append(angleError.tolist())
             self._historyRateError.append(rateError.tolist())
             self._historyReferenceAngles.append(self._currentTargetAngles.tolist())
@@ -129,12 +143,14 @@ class DroneStabilityController(threading.Thread):
             self._historyTargetRate.append(targetRate.tolist())
             self._historyRate.append(self._currentAngularVelocity.tolist())
 
+            iteration += 1
+
         self.graphErrors()
 
     def updateOrientation(self):
-        self._stabilityOrientationUpdateEvent.wait()
+        self._stabilityOrientationUpdateEvent.wait()  # Sets thread frequency to 1000 Hz
         with self._stabilityLock:
-            self._timestamp = self._stabilityData["timestamp"]
+            self._currentTimestamp = self._stabilityData["timestamp"]
             self._timestep = self._stabilityData["timestep"]
             self._currentOrientation = np.array(
                 self._stabilityData["currentOrientation"]
@@ -153,17 +169,10 @@ class DroneStabilityController(threading.Thread):
             rotorAdjustments = self._rotorAdjustments.copy()
         return rotorAdjustments
 
-    def sendRotorAdjustments(self, rotorAdjustments):
-        while self._stabilityResultEvent.is_set():
-            continue
-        with self._stabilityActionLock:
-            self._rotorAdjustments = rotorAdjustments
-            self._stabilityResultEvent.set()
-
     def stop(self):
         self._shutdownEvent.set()
+        self._stabilityOrientationUpdateEvent.set()
         print("[DroneStabilityController] Shutting Down.")
-        # self.graphErrors()
 
     def graphErrors(self):
 
@@ -191,6 +200,7 @@ class DroneStabilityController(threading.Thread):
         plt.ylabel("Error [rad]")
         plt.legend()
         plt.savefig(os.path.join(output_dir, "AttitudeAngleControl_Errors.png"))
+        plt.close()
         print("[Drone Stability Controller] AttitudeAngleControl_Errors.png saved")
 
         # --- Rate Error Plot ---
@@ -203,6 +213,7 @@ class DroneStabilityController(threading.Thread):
         plt.ylabel("Error [rad/s]")
         plt.legend()
         plt.savefig(os.path.join(output_dir, "AttitudeRateControl_Errors.png"))
+        plt.close()
         print("[Drone Stability Controller] AttitudeRateControl_Errors.png saved")
 
         reference_angles = np.array(self._historyReferenceAngles)
@@ -219,6 +230,7 @@ class DroneStabilityController(threading.Thread):
             plt.ylabel("Angle [rad]")
             plt.legend()
             plt.savefig(os.path.join(output_dir, f"{labels[i]}Control.png"))
+            plt.close()
             print(f"[Drone Stability Controller] {labels[i]}Control.png saved")
 
         # --- Reference vs Current Rate Plot ---
@@ -232,12 +244,14 @@ class DroneStabilityController(threading.Thread):
             plt.ylabel("Angle [rad/s]")
             plt.legend()
             plt.savefig(os.path.join(output_dir, f"{labels[i]}_Rate_Control.png"))
+            plt.close()
             print(f"[Drone Stability Controller] {labels[i]}_Rate_Control.png saved")
 
         roll_output = [v[0] for v in self._historyRotorAdjustments]
         pitch_output = [v[1] for v in self._historyRotorAdjustments]
         yaw_output = [v[2] for v in self._historyRotorAdjustments]
 
+        # --- Control Output Plot ---
         plt.figure()
         plt.clf()
         plt.plot(time, roll_output, label="Roll Output")
@@ -250,6 +264,7 @@ class DroneStabilityController(threading.Thread):
         plt.legend()
         plt.tight_layout()
         plt.savefig(os.path.join(output_dir, "ControlOutput.png"))
+        plt.close()
         print("[Drone Stability Controller] ControlOutput.png saved")
 
     @staticmethod
