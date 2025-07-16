@@ -1,4 +1,5 @@
 import threading
+import matplotlib
 import matplotlib.pyplot as plt
 import os
 import numpy as np
@@ -61,12 +62,17 @@ class DroneHeightController(threading.Thread):
         self._historyVelocity = []
         self._historyVelocityRef = []
 
+        self._debugging = False
+
     def run(self):
         rotorForce = 0.0
         integralVelocityError = 0.0
         derivativeVelocityError = 0.0
         previousVelocityError = 0.0
-        previousTimestamp = 0.0
+        previousTimestampPID = 0.0
+        previousTimestampP = 0.0
+        dtPID = 0.002
+        dtP = 0.01
         print("[DroneHeightController] Initialized.")
         iteration = 0
         gravity = 9.81
@@ -74,29 +80,40 @@ class DroneHeightController(threading.Thread):
         MAX_VEL = 2.0  # Maximum ascension velocity in m/s
 
         while not self._shutdownEvent.is_set():
-            iteration += 1
-
+            debug = self._debugging and iteration % 100 == 0
             self.updateHeightController()
-            """ if iteration % 15 == 0:
-                print("[DroneHeightController] Height data updated.") """
-            dt = self._currentTimestamp - previousTimestamp
-            previousTimestamp = self._currentTimestamp
+
+            if debug:
+                print(
+                    f"[DroneHeightController] Iteration: {iteration}, current timestamp: {self._currentTimestamp}"
+                )
+                print("[DroneHeightController] Height data updated.")
 
             if iteration == 1 or iteration % 10 == 0:
                 # Height controller: P controller whose output is the target ascension velocity.
-                # Will execute with a frequency of f = 100 Hz (given that timestep = 0.001)
+                # Will execute with a frequency of f = 100 Hz (given that timestep = 0.001). Therefore, dtP = 0.01
 
                 heightError = self._heightReference - self._currentHeight
                 targetVelocity = np.clip(self._pKp * heightError, -MAX_VEL, MAX_VEL)
+                dtP = self._currentTimestamp - previousTimestampP
+                previousTimestampP = self._currentTimestamp
 
             if iteration == 1 or iteration % 2 == 0:
                 # Velocity controller: PID controller whose output is the base thrust to be applied.
-                # Will execute with a frequency of f = 500 Hz (given that timestep = 0.001)
+                # Will execute with a frequency of f = 500 Hz (given that timestep = 0.001). Therefore, dtPID = 0.002
 
                 velocityError = targetVelocity - self._currentVelocity[2]
-                derivativeVelocityError = (velocityError - previousVelocityError) / dt
-                integralVelocityError += velocityError * dt
+                derivativeVelocityError = (
+                    velocityError - previousVelocityError
+                ) / dtPID
+                integralVelocityError += velocityError * dtPID
                 previousVelocityError = velocityError
+                dtPID = self._currentTimestamp - previousTimestampPID
+                previousTimestampPID = self._currentTimestamp
+
+                if debug:
+                    print(f"[DroneHeightController] dtPID: {dtPID}")
+                    print(f"[DroneHeightController] dtP: {dtP}")
 
                 rotorForce = (
                     self._pidKp * velocityError
@@ -105,17 +122,17 @@ class DroneHeightController(threading.Thread):
                     + gravity * mass
                 )
 
-            if rotorForce > self.MAX_CONTROL_INPUT:
-                rotorForce = self.MAX_CONTROL_INPUT
-                integralVelocityError = integralVelocityError
-            elif rotorForce < self.MIN_CONTROL_INPUT:
-                rotorForce = self.MIN_CONTROL_INPUT
-            else:
-                integralVelocityError += velocityError * dt
+                if rotorForce > self.MAX_CONTROL_INPUT:
+                    rotorForce = self.MAX_CONTROL_INPUT
+                    integralVelocityError = integralVelocityError
+                elif rotorForce < self.MIN_CONTROL_INPUT:
+                    rotorForce = self.MIN_CONTROL_INPUT
+                else:
+                    integralVelocityError += velocityError * dtPID
 
             reachedReference = self.checkReachedReferences(heightError, velocityError)
-            """ if iteration % 100 == 0:
-                print(f"[DroneHeightController] reachedReference: {reachedReference}") """
+            if debug:
+                print(f"[DroneHeightController] reachedReference: {reachedReference}")
 
             with self._heightResultsLock:
                 self._rotorForce = rotorForce
@@ -134,10 +151,13 @@ class DroneHeightController(threading.Thread):
             self._historyVelocity.append(self._currentVelocity[2])
             self._historyVelocityRef.append(targetVelocity)
 
+            iteration += 1
         self.graphControlProcess()
 
     def stop(self):
         self._shutdownEvent.set()
+        self._heightControllerUpdateEvent.set()
+        # self.graphControlProcess()
         print("[DroneHeightController] Shutting Down.")
 
     def setHeightData(self, heightData):
@@ -146,14 +166,17 @@ class DroneHeightController(threading.Thread):
 
     def updateHeightController(self):
         """Update the height controller with the latest height data."""
-        self._heightControllerUpdateEvent.wait()
-        self._currentTimestamp = self._heightData["timestamp"]
-        self._currentHeight = self._heightData["currentHeight"]
-        self._currentVelocity = self._heightData["currentVelocity"].copy()
-        self._heightReference = self._heightData["heightReference"]
+        self._heightControllerUpdateEvent.wait()  # Sets thread frequency to 1000 Hz
+        with self._heightUpdateLock:
+            self._currentTimestamp = self._heightData["timestamp"]
+            self._currentHeight = self._heightData["currentHeight"]
+            self._currentVelocity = self._heightData["currentVelocity"].copy()
+            heightReference = self._heightData["heightReference"]
 
-        if self._heightReference < 0.45:
+        if heightReference < 0.45:
             self._heightReference = 0.45
+        else:
+            self._heightReference = heightReference
 
         if self._heightReference != self._previousHeightReference:
             self._heightReferenceChanged = True
@@ -196,8 +219,8 @@ class DroneHeightController(threading.Thread):
     def graphControlProcess(self):
         output_dir = "/home/nicolas/tfg/Memoria/GraficasAltura"
         os.makedirs(output_dir, exist_ok=True)
+        matplotlib.use("Agg")  # Add this line before importing pyplot
 
-        # Height graph
         time = np.array(self._historyTime)
         historyHeight = np.array(self._historyCurrentHeight)
         historyHeightReference = np.array(self._historyHeightReference)
@@ -206,27 +229,31 @@ class DroneHeightController(threading.Thread):
         historyHeightError = np.array(self._historyHeightError)
         historyRotorForce = np.array(self._historyRotorForce)
 
-        # Height error graph - dummy
+        # --- Height graph (dummy) ---
         plt.figure()
+        plt.clf()
         plt.plot(time, historyHeightError, label="Error")
         plt.title("Height Control - Error")
         plt.xlabel("Time [s]")
         plt.ylabel("Height [m]")
         plt.legend()
         plt.savefig(os.path.join(output_dir, "HeightControl_Error_Dummy.png"))
+        plt.close()
         print("[Drone Height Controller] HeightControl_Error_Dummy.png saved")
 
-        # Height error graph
+        # --- Height error ---
         plt.figure()
+        plt.clf()
         plt.plot(time, historyHeightError, label="Error")
         plt.title("Height Control - Error")
         plt.xlabel("Time [s]")
         plt.ylabel("Height [m]")
         plt.legend()
         plt.savefig(os.path.join(output_dir, "HeightControl_Error.png"))
+        plt.close()
         print("[Drone Height Controller] HeightControl_Error.png saved")
 
-        # Force graph
+        # --- Force ---
         plt.figure()
         plt.clf()
         plt.plot(time, historyRotorForce, label="Rotor Force")
@@ -238,6 +265,7 @@ class DroneHeightController(threading.Thread):
         plt.close()
         print("[Drone Height Controller] HeightControl_RotorForce.png saved")
 
+        # --- Height and height reference ---
         plt.figure()
         plt.clf()
         plt.plot(time, historyHeight, label="Height")
@@ -250,6 +278,7 @@ class DroneHeightController(threading.Thread):
         plt.close()
         print("[Drone Height Controller] HeightControl_Ref.png saved")
 
+        # --- Velocity and velocity reference ---
         plt.figure()
         plt.clf()
         plt.plot(time, historyVelocity, label="Velocity")
