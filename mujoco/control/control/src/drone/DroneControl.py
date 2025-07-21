@@ -61,7 +61,6 @@ class DroneControl(threading.Thread):
         # Coordinates Controller
         self._coordinatesUpdateEvent = threading.Event()
         self._coordinatesAnglesLock = threading.Lock()
-        # self._coordinatesThrustLock = threading.Lock()
         self._coordinatesLock = threading.Lock()
         self._coordinatesData = {
             "timestamp": 0.0,
@@ -71,7 +70,6 @@ class DroneControl(threading.Thread):
             "currentVelocity": [0.0, 0.0, 0.0],
             "currentTargetVelocity": [0.0, 0.0, 0.0],
             "currentAcceleration": [0.0, 0.0, 0.0],
-            # "currentTargetAcceleration": [0.0, 0.0, 0.0],
             "currentOrientation": [1.0, 0.0, 0.0, 0.0],
         }
 
@@ -81,17 +79,16 @@ class DroneControl(threading.Thread):
             self._coordinatesLock,
             self._coordinatesData,
             self._coordinatesAnglesLock,
-            # self._coordinatesThrustLock,
         )
         self._coordinatesController.start()
 
-        self._sensorData = SensorData(
+        self._previousSensorData = SensorData(
             timestamp=0.0,
             timestep=0.001,
             sensorValues={
                 "body_linacc": [0.0, 0.0, 0.0],
                 "body_gyro": [0.0, 0.0, 0.0],
-                "body_quat": [1.0, 0.0, 0.0, 0.0],  # orientación neutral
+                "body_quat": [1.0, 0.0, 0.0, 0.0],  # neutral orientation
                 "drone_load_com": [0.0, 0.0, 0.0],
                 "body_vel": [0.0, 0.0, 0.0],
             },
@@ -99,8 +96,12 @@ class DroneControl(threading.Thread):
             dronePosition=[0.0, 0.0, 0.45],
             manipulatorPosition=[0.0, 0.0, 0.0],
         )
+        self._sensorData: SensorData
         self._controlAction = ControlAction(droneThrusters={})
         self._controlMessage: ControlMessage
+        self._previousControlMessage = ControlMessage(
+            grasp=False, referenceX=0.0, referenceY=0.0, referenceZ=0.45
+        )
 
         self._droneControlQueue = droneControlQueue  # receives from TaskManager Thread
         self._sensorQueue = sensorQueue  # receives from MuJoCo Simulation Thread
@@ -123,9 +124,12 @@ class DroneControl(threading.Thread):
         self._currentTargetPosition = np.zeros(3)
         self._currentTargetVelocity = np.zeros(3)
 
+        self._debugging = False
+        self._debug = False
+
     def run(self):
         print("[DroneControl] Initialized.")
-
+        iteration = 0
         while not self._shutdownEvent.is_set():
             self.getControlMessage()
             self.getSensorsData()
@@ -140,6 +144,9 @@ class DroneControl(threading.Thread):
 
             self.sendControlInputs()
 
+            iteration += 1
+            self._debug = self._debugging and iteration % 300 == 0
+
         print("[DroneControl] Shutting down.")
 
     def stop(self):
@@ -153,17 +160,24 @@ class DroneControl(threading.Thread):
         self._shutdownEvent.set()
 
     def getControlMessage(self):
-        self._taskManagerManeuverEvent.wait()
+        self._taskManagerManeuverEvent.wait(timeout=0.001)
+        if self._debug:
+            print("Control Message received")
         try:
             self._controlMessage = self._droneControlQueue.get(timeout=0.001)
+            self._previousControlMessage = self._controlMessage
         except queue.Empty:
-            pass
+            self._controlMessage = self._previousControlMessage
 
     def getSensorsData(self):
-        self._sendSensorsEvent.wait()
+        self._sendSensorsEvent.wait(timeout=0.001)
+        if self._debug:
+            print("Sensor Data received")
         try:
             self._sensorData = self._sensorQueue.get(timeout=0.001)
+            self._previousSensorData = self._sensorData
         except queue.Empty:
+            self._sensorData = self._previousSensorData
             pass
         self._sendSensorsEvent.clear()
 
@@ -207,7 +221,7 @@ class DroneControl(threading.Thread):
         heightData = {
             "timestamp": self._currentTimestamp,
             "currentHeight": self._currentPosition[2],
-            "heightReference": 3,  # self._controlMessage.referenceZ  o 3 si lo prefieres
+            "heightReference": self._controlMessage.referenceZ,
             "currentVelocity": self._currentVelocity.copy(),
         }
         self._heightController.setHeightData(heightData)
@@ -238,7 +252,6 @@ class DroneControl(threading.Thread):
         coordinatesData["positionReference"] = self._currentTargetPosition.copy()
         coordinatesData["currentVelocity"] = self._currentVelocity.copy()
         coordinatesData["currentTargetVelocity"] = [1.0, 1.0, 1.0]
-        # coordinatesData["currentTargetVelocity"] = self._currentTargetVelocity.copy()
         coordinatesData["currentAcceleration"] = self._currentAcceleration.copy()
         coordinatesData["currentOrientation"] = self._currentOrientation.copy()
         coordinatesData["currentAcceleration"] = [2.0, 2.0, 2.0]
@@ -247,11 +260,11 @@ class DroneControl(threading.Thread):
         self._coordinatesUpdateEvent.set()
 
     def combineControllersOutputs(self):
-        # baseThrust = self._coordinatesController.getBaseThrust()
         baseThrust = self._heightController.getRotorForce()
-        # print(f"[DroneControl] Base Thrust: {baseThrust}")
         stabilityRotorAdjustments = self._stabilityController.getRotorAdjustments()
-        # print(f"[DroneControl] Stability Adjustments: {stabilityRotorAdjustments}")
+        if self._debug:
+            print(f"[DroneControl] Base Thrust: {baseThrust}")
+            print(f"[DroneControl] Stability Adjustments: {stabilityRotorAdjustments}")
 
         MAX_CONTROL_INPUT = 40
         MIN_CONTROL_INPUT = 0
@@ -282,12 +295,17 @@ class DroneControl(threading.Thread):
 
     def checkReachedReferences(self):
         heightReferenceReached = self._heightController.getReachedReference()
-        # print(f"[DroneControl] Height reference reached: {heightReferenceReached}")
         positionReferenceReached = self._coordinatesController.getReachedReference()
-        # print(f"[DroneControl] Position reference reached: {positionReferenceReached}")
+
         self._reachedReferences = heightReferenceReached and positionReferenceReached
         if self._reachedReferences:
             print(
                 "[DroneControl] Height reference and position reference have been reached."
             )
             self._taskManagerManeuverEvent.clear()
+
+        if self._debug:
+            print(
+                f"[DroneControl] Position reference reached: {positionReferenceReached}"
+            )
+            print(f"[DroneControl] Height reference reached: {heightReferenceReached}")
