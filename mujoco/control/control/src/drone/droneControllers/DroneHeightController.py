@@ -1,6 +1,7 @@
 import threading
 import matplotlib
 import matplotlib.pyplot as plt
+import matplotlib
 import os
 import numpy as np
 import time
@@ -25,7 +26,7 @@ class DroneHeightController(threading.Thread):
         self._pidKi = 30.0
         self._pidKd = 0.0
         self._pKp = 3.35
-        self.MAX_CONTROL_INPUT = 30
+        self.MAX_CONTROL_INPUT = 40
         self.MIN_CONTROL_INPUT = 0
         self._rotorForce = 0.0  # Base thrust to be applied to the rotors
 
@@ -78,6 +79,7 @@ class DroneHeightController(threading.Thread):
         gravity = 9.81
         mass = 4.5  # Mass of the drone in kg
         MAX_VEL = 2.0  # Maximum ascension velocity in m/s
+        self._historyStartTime = time.time()
 
         while not self._shutdownEvent.is_set():
             debug = self._debugging and iteration % 100 == 0
@@ -152,12 +154,12 @@ class DroneHeightController(threading.Thread):
             self._historyVelocityRef.append(targetVelocity)
 
             iteration += 1
+        self._historyEndTime = time.time()
         self.graphControlProcess()
 
     def stop(self):
         self._shutdownEvent.set()
         self._heightControllerUpdateEvent.set()
-        # self.graphControlProcess()
         print("[DroneHeightController] Shutting Down.")
 
     def setHeightData(self, heightData):
@@ -219,9 +221,18 @@ class DroneHeightController(threading.Thread):
     def graphControlProcess(self):
         output_dir = "/home/nicolas/tfg/Memoria/GraficasAltura"
         os.makedirs(output_dir, exist_ok=True)
-        matplotlib.use("Agg")  # Add this line before importing pyplot
+        matplotlib.use("Agg")
 
-        time = np.array(self._historyTime)
+        time_sim = np.array(self._historyTime)
+        # Escalado: tiempo real total / tiempo simulado total
+        real_duration = self._historyTime[-1] - self._historyTime[0]
+        wall_clock_duration = (
+            self._historyEndTime - self._historyStartTime
+        )  # Debes guardar estos valores con time.time() al inicio y fin de la simulación
+        scale_factor = wall_clock_duration / real_duration if real_duration > 0 else 1.0
+        time = (time_sim - time_sim[0]) * scale_factor
+
+        # time = np.array(self._historyTime)
         historyHeight = np.array(self._historyCurrentHeight)
         historyHeightReference = np.array(self._historyHeightReference)
         historyVelocity = np.array(self._historyVelocity)
