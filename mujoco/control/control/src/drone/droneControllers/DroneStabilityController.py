@@ -4,6 +4,7 @@ import matplotlib
 import numpy as np
 from typing import List
 import os
+import time
 
 
 class DroneStabilityController(threading.Thread):
@@ -61,13 +62,12 @@ class DroneStabilityController(threading.Thread):
 
     def run(self):
         print("[DroneStabilityController] Initialized.")
-        previousTimePID = 0
-        previousTimeP = 0
         previousRateError = np.zeros(3)
         integralRateError = np.zeros(3)
         iteration = 0
         dtPID = 0.001
         dtP = 0.004
+        self._historyStartTime = time.time()
 
         while not self._shutdownEvent.is_set():
             debug = self._debugging and iteration % 100 == 0
@@ -77,7 +77,6 @@ class DroneStabilityController(threading.Thread):
                 # Attitude controller: P controller whose output is the target rate.
                 # Will execute with a frequency of f = 250 Hz (given that timestep = 0.001). Therefore, dtP = 0.004.
 
-                dtP = self._currentTimestamp - previousTimeP
                 previousTimeP = self._currentTimestamp
                 # Convert quaternion to Euler angles (roll, pitch, yaw) - in radians
                 currentAngles = np.array(
@@ -95,7 +94,6 @@ class DroneStabilityController(threading.Thread):
                 print(
                     f"[DroneStabilityController] currentAngularVelocity: {self._currentAngularVelocity}, targetRate: {targetRate}"
                 )
-                print(f"[DroneStabilityController] dtP: {dtP}")
 
             # Rate controller: PID controller whose output is the torques to be applied.
             # Will execute with a frequency of f = 1000 Hz (given that timestep = 0.001). Therefore, dtPID = 0.001.
@@ -104,8 +102,6 @@ class DroneStabilityController(threading.Thread):
             derivativeError = (rateError - previousRateError) / dtPID
             integralRateError += rateError * dtPID
             previousRateError = rateError
-            dtPID = self._currentTimestamp - previousTimePID
-            previousTimePID = self._currentTimestamp
             controlOutput = (
                 self._pidKp * rateError
                 + self._pidKi * integralRateError
@@ -128,7 +124,6 @@ class DroneStabilityController(threading.Thread):
                 print(
                     f"[DroneStabilityController] rotorAdjustments: {rotorAdjustments}"
                 )
-                print(f"[DroneStabilityController] dtPID: {dtPID}")
 
             with self._stabilityActionLock:
                 self._rotorAdjustments = rotorAdjustments
@@ -145,6 +140,7 @@ class DroneStabilityController(threading.Thread):
 
             iteration += 1
 
+        self._historyEndTime = time.time()
         self.graphErrors()
 
     def updateOrientation(self):
@@ -172,6 +168,7 @@ class DroneStabilityController(threading.Thread):
     def stop(self):
         self._shutdownEvent.set()
         self._stabilityOrientationUpdateEvent.set()
+        self._stabilityOrientationUpdateEvent.set()
         print("[DroneStabilityController] Shutting Down.")
 
     def graphErrors(self):
@@ -180,10 +177,20 @@ class DroneStabilityController(threading.Thread):
         os.makedirs(output_dir, exist_ok=True)
         matplotlib.use("Agg")
 
+        time_sim = np.array(self._historyTime)
+        # Escalado: tiempo real total / tiempo simulado total
+        real_duration = self._historyTime[-1] - self._historyTime[0]
+        wall_clock_duration = (
+            self._historyEndTime - self._historyStartTime
+        )  # Debes guardar estos valores con time.time() al inicio y fin de la simulación
+        scale_factor = wall_clock_duration / real_duration if real_duration > 0 else 1.0
+        time_real = (time_sim - time_sim[0]) * scale_factor
+        time = time_real
+
         if not self._historyTime or not self._historyRotorAdjustments:
             return
 
-        time = np.array(self._historyTime)
+        # time = np.array(self._historyTime)
         rateErrors = np.array(self._historyRateError)
         angleErrors = np.array(self._historyAngleError)
         targetRate = np.array(self._historyTargetRate)
