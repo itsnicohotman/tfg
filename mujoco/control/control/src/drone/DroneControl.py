@@ -254,7 +254,6 @@ class DroneControl(threading.Thread):
         coordinatesData["currentTargetVelocity"] = [1.0, 1.0, 1.0]
         coordinatesData["currentAcceleration"] = self._currentAcceleration.copy()
         coordinatesData["currentOrientation"] = self._currentOrientation.copy()
-        coordinatesData["currentAcceleration"] = [2.0, 2.0, 2.0]
 
         self._coordinatesController.setCoordinatesData(coordinatesData)
         self._coordinatesUpdateEvent.set()
@@ -299,9 +298,10 @@ class DroneControl(threading.Thread):
 
         self._reachedReferences = heightReferenceReached and positionReferenceReached
         if self._reachedReferences:
-            print(
-                "[DroneControl] Height reference and position reference have been reached."
-            )
+            if self._debug:
+                print(
+                    "[DroneControl] Height reference and position reference have been reached."
+                )
             self._taskManagerManeuverEvent.clear()
 
         if self._debug:

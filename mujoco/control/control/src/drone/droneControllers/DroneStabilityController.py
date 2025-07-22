@@ -178,19 +178,15 @@ class DroneStabilityController(threading.Thread):
         matplotlib.use("Agg")
 
         time_sim = np.array(self._historyTime)
-        # Escalado: tiempo real total / tiempo simulado total
+        # Scaling: real time / simulated time
         real_duration = self._historyTime[-1] - self._historyTime[0]
-        wall_clock_duration = (
-            self._historyEndTime - self._historyStartTime
-        )  # Debes guardar estos valores con time.time() al inicio y fin de la simulación
+        wall_clock_duration = self._historyEndTime - self._historyStartTime
         scale_factor = wall_clock_duration / real_duration if real_duration > 0 else 1.0
-        time_real = (time_sim - time_sim[0]) * scale_factor
-        time = time_real
+        time = (time_sim - time_sim[0]) * scale_factor
 
         if not self._historyTime or not self._historyRotorAdjustments:
             return
 
-        # time = np.array(self._historyTime)
         rateErrors = np.array(self._historyRateError)
         angleErrors = np.array(self._historyAngleError)
         targetRate = np.array(self._historyTargetRate)
