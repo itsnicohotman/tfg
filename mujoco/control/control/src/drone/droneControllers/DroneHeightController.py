@@ -110,8 +110,8 @@ class DroneHeightController(threading.Thread):
                 ) / dtPID
                 integralVelocityError += velocityError * dtPID
                 previousVelocityError = velocityError
-                dtPID = self._currentTimestamp - previousTimestampPID
-                previousTimestampPID = self._currentTimestamp
+                # dtPID = self._currentTimestamp - previousTimestampPID
+                # previousTimestampPID = self._currentTimestamp
 
                 if debug:
                     print(f"[DroneHeightController] dtPID: {dtPID}")
@@ -223,16 +223,13 @@ class DroneHeightController(threading.Thread):
         os.makedirs(output_dir, exist_ok=True)
         matplotlib.use("Agg")
 
+        # Scaling: real time / simulated time
         time_sim = np.array(self._historyTime)
-        # Escalado: tiempo real total / tiempo simulado total
         real_duration = self._historyTime[-1] - self._historyTime[0]
-        wall_clock_duration = (
-            self._historyEndTime - self._historyStartTime
-        )  # Debes guardar estos valores con time.time() al inicio y fin de la simulación
+        wall_clock_duration = self._historyEndTime - self._historyStartTime
         scale_factor = wall_clock_duration / real_duration if real_duration > 0 else 1.0
         time = (time_sim - time_sim[0]) * scale_factor
 
-        # time = np.array(self._historyTime)
         historyHeight = np.array(self._historyCurrentHeight)
         historyHeightReference = np.array(self._historyHeightReference)
         historyVelocity = np.array(self._historyVelocity)
