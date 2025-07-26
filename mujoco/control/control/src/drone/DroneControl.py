@@ -14,16 +14,13 @@ class DroneControl(threading.Thread):
         self,
         shutdownEvent: threading.Event,
         maneuverEvent: threading.Event,
-        sendSensorsEvent: threading.Event,
         recvControlEvent: threading.Event,
-        sensorQueue: queue.Queue,
         controlQueue: queue.Queue,
         droneControlQueue: queue.Queue,
     ):
         super().__init__()
         self._taskManagerManeuverEvent = maneuverEvent
         self._shutdownEvent = shutdownEvent
-        self._sendSensorsEvent = sendSensorsEvent
         self._recvControlEvent = recvControlEvent
 
         # Height Controller
@@ -106,7 +103,6 @@ class DroneControl(threading.Thread):
         )
 
         self._droneControlQueue = droneControlQueue  # receives from TaskManager Thread
-        self._sensorQueue = sensorQueue  # receives from MuJoCo Simulation Thread
         self._controlQueue = controlQueue  # sends to MuJoCo Simulation Thread
 
         self._lastCheckTime = None
@@ -134,7 +130,6 @@ class DroneControl(threading.Thread):
         iteration = 0
         while not self._shutdownEvent.is_set():
             self.getControlMessage()
-            self.getSensorsData()
             self.updateCurrentState()
 
             self.updateCoordinatesController()
@@ -170,18 +165,6 @@ class DroneControl(threading.Thread):
             self._previousControlMessage = self._controlMessage
         except queue.Empty:
             self._controlMessage = self._previousControlMessage
-
-    def getSensorsData(self):
-        self._sendSensorsEvent.wait(timeout=0.001)
-        if self._debug:
-            print("Sensor Data received")
-        try:
-            self._sensorData = self._sensorQueue.get(timeout=0.001)
-            self._previousSensorData = self._sensorData
-        except queue.Empty:
-            self._sensorData = self._previousSensorData
-            pass
-        self._sendSensorsEvent.clear()
 
     def setSensorData(self, sensorData: SensorData):
         with self._sensorLock:

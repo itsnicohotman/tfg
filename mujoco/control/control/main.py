@@ -27,12 +27,8 @@ def main():
 
     shutdownEvent = threading.Event()
     maneuverEvent = threading.Event()
-    sendSensorsEvent = (
-        threading.Event()
-    )  # from the point of view of the simulation thread
     recvControlEvent = threading.Event()
 
-    sensorQueue = queue.Queue()
     controlQueue = queue.Queue()  # sends to MuJoCo Simulation Thread
     droneControlQueue = queue.Queue()  # receives from TaskManager Thread
 
@@ -44,13 +40,11 @@ def main():
     droneController = DroneControl(
         shutdownEvent,
         maneuverEvent,
-        sendSensorsEvent,
         recvControlEvent,
-        sensorQueue,
         controlQueue,
         droneControlQueue,
     )
-    # droneController.start()
+
     # Initialize Task Manager in a separate thread.
     taskManager = TaskManager(shutdownEvent, maneuverEvent, droneControlQueue)
     taskManager.start()
@@ -60,9 +54,7 @@ def main():
     gcs = GCS(root, taskManager, shutdownEvent)
 
     mujocoSim = MujocoSimulation(
-        sensorQueue,
         controlQueue,
-        sendSensorsEvent,
         recvControlEvent,
         shutdownEvent,
         model,

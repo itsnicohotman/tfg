@@ -16,9 +16,9 @@ from src.drone.DroneControl import DroneControl
 class MujocoSimulation(threading.Thread):
     def __init__(
         self,
-        sensorQueue: queue.Queue,
+        # sensorQueue: queue.Queue,
         controlQueue: queue.Queue,
-        sendSensorsEvent: threading.Event,
+        # sendSensorsEvent: threading.Event,
         recvControlEvent: threading.Event,
         shutdownEvent: threading.Event,
         model,
@@ -50,9 +50,7 @@ class MujocoSimulation(threading.Thread):
 
         self._model = mujoco.MjModel.from_xml_path(MODEL_PATH)
         self._data = mujoco.MjData(self._model)
-        self._sensorQueue = sensorQueue
         self._controlQueue = controlQueue
-        self._sendSensorsEvent = sendSensorsEvent
         self._recvControlEvent = recvControlEvent
         self._shutdownEvent = shutdownEvent
         self._viewer = None
@@ -64,38 +62,41 @@ class MujocoSimulation(threading.Thread):
         }
         self._droneController = droneController
 
+        self._debug = False
+
     def run(self):
         print("[MujocoSimulation] Initialized.")
         real_start = time.time()
         sim_start = self._data.time
+
+        # Start viewer thread
         self._viewerRunning.set()
         self._viewerThread = threading.Thread(target=self.launchViewer)
         self._viewerThread.start()
-        # with mujoco.viewer.launch_passive(
-        #     self._model, self._data, show_left_ui=False, show_right_ui=False
-        # ) as viewer:
-        #     self._viewer = viewer
+
+        # Initialize key variables
         sensorValues = {}
         droneID = mujoco.mj_name2id(self._model, mujoco.mjtObj.mjOBJ_BODY, "drone")
         droneGlobalPosition = self._data.xpos[droneID]
         """ manipulatorID = mujoco.mj_name2id(self._model, mujoco.mjtObj.mjOBJ_BODY, 'manipulator')
         manipulatorGlobalPosition = self._data.xpos[manipulatorID] """
-        # self.setViewersCamera(droneID)
         iteration = 0
         timestep = self._model.opt.timestep
-        nextTime = time.time()
+        nextTime = time.perf_counter()
 
         while not self._shutdownEvent.is_set():
+            tStart = time.perf_counter()
+            # t0 = time.time()
             iteration += 1
-            t0 = time.time()
+            debugging = self._debug and iteration % 100 == 0
+
+            # Simulation step. 0.001s
             mujoco.mj_step(self._model, self._data)
-            t05 = time.time()
-            # PROBAR CON DIFERENTES MANERAS DE ALIVIAR LA CARGA COMPUTACIONAL DEL VIEWER. POR EJEMPLO, HILO SEPARADO O RENDERIZANDO CON FRECUENCIA DE 100HZ
-            # if iteration % 10 == 0:
-            # self._viewer.sync()
-            # self._viewer
+
             # t1 = time.time()
             # iteration = self.testDroneControl(droneID, iteration)
+
+            # Get sensor data and send to DroneControl thread
             index = 0
             for i in range(self._model.nsensor):
                 name = self._model.sensor(i).name
@@ -113,13 +114,12 @@ class MujocoSimulation(threading.Thread):
             )
 
             self._droneController.setSensorData(sensorDataMessage)
-            # self._sensorQueue.put(sensorDataMessage)
-            # self._sendSensorsEvent.set()
 
-            t2 = time.time()
+            # Get control output from DroneControl thread
+            # t2 = time.time()
 
             self._recvControlEvent.wait(timeout=0.0001)
-            t21 = time.time()
+            # t21 = time.time()
             try:
                 controlAction: ControlAction = self._controlQueue.get_nowait()
                 allControlActions = {**controlAction.droneThrusters}
@@ -133,33 +133,45 @@ class MujocoSimulation(threading.Thread):
             except queue.Empty:
                 pass
 
-            t3 = time.time()
+                # t3 = time.time()
 
-            if iteration % 1000 == 0:
-                elapsedRecvControl = t3 - t2
-                elapsedRecvControlNoWait = t3 - t21
-                elapsedSendData = t2 - t05
-                elapsedStep = t05 - t0
-                elapsedTotal = t3 - t0
-                # elapsedViewer = t1 - t05
-                # print(
-                #     f"[TIMING] Step: {elapsedStep:.6f}, Viewer: {elapsedViewer}, receive control: {elapsedRecvControl:.6f}, send sensors: {elapsedSendData:.6f}"
-                # )
-                print(
-                    f"[TIMING] Step: {elapsedStep:.6f}, recv control: {elapsedRecvControl:.6f},recv control without Wait: {elapsedRecvControlNoWait:.6f}, send sensors: {elapsedSendData:.6f}, TOTAL: {elapsedTotal}"
-                )
-                real_elapsed = time.time() - real_start
-                sim_elapsed = self._data.time - sim_start
-                print(f"[Tiempos] Sim: {sim_elapsed:.2f} s, Real: {real_elapsed:.2f} s")
+            # Maintain a constant simulation period.
+            tFinal = time.perf_counter()
+            elapsedCycle = tFinal - tStart
 
             nextTime += timestep
-            sleepDuration = nextTime - time.time()
-            if sleepDuration > 0:
-                time.sleep(sleepDuration)
-                if iteration % 100 == 0:
-                    print(f"[TIMING] Sleep duration: {sleepDuration}")
-            else:
-                nextTime = time.time()
+            now = time.perf_counter()
+            sleepDuration = nextTime - now
+
+            if debugging:
+                real_elapsed = time.time() - real_start
+                sim_elapsed = self._data.time - sim_start
+
+                print(
+                    f"[MujocoSimulation] Elapsed Cycle: {elapsedCycle}, Sleep Duration; {sleepDuration}."
+                )
+                print(
+                    f"[MujocoSimulation] Sim Time: {sim_elapsed:.2f} s, Real Time: {real_elapsed:.2f} s"
+                )
+                # elapsedRecvControl = t3 - t2
+                # elapsedRecvControlNoWait = t3 - t21
+                # elapsedSendData = t2 - t05
+                # elapsedStep = t05 - t0
+                # elapsedTotal = t3 - t0
+                # print(
+                #     f"[MujcoSimulation] Step: {elapsedStep:.6f}, recv control: {elapsedRecvControl:.6f},recv control without Wait: {elapsedRecvControlNoWait:.6f}, send sensors: {elapsedSendData:.6f}, TOTAL: {elapsedTotal}"
+                # )
+
+            if sleepDuration > 0.0001:
+                time.sleep(sleepDuration - 0.00005)  # Sleeps most of the time
+
+            # Busy-wait the last ~50 µs
+            while time.perf_counter() < nextTime:
+                pass
+
+            if debugging:
+                totalCycle = time.perf_counter() - tStart
+                print(f"[MujocoSimulation] Total Cycle: {totalCycle}.")
 
         print("[MujocoSimulation] Ending simulation.")
         self._viewerRunning.clear()
@@ -168,13 +180,11 @@ class MujocoSimulation(threading.Thread):
     def stop(self):
         print("[MujocoSimulation] Ending simulation.")
         self._shutdownEvent.set()
-        # self._viewer.close()
         self._viewerRunning.clear()
         if self._viewerThread:
             self._viewerThread.join()
 
     def setViewersCamera(self, droneID):
-        # self._viewer.cam.type = mujoco.mjtCamera.mjCAMERA_FREE
         self._viewer.cam.type = mujoco.mjtCamera.mjCAMERA_TRACKING
         self._viewer.cam.trackbodyid = droneID
         self._viewer.cam.distance = 5.0
@@ -201,8 +211,8 @@ class MujocoSimulation(threading.Thread):
             self.setViewersCamera(droneID)
             while self._viewerRunning.is_set():
                 try:
-                    self._viewer.sync()  # Usa state_only=True si tu versión lo soporta
-                    time.sleep(0.001)  # Control de FPS (1000 Hz)
+                    self._viewer.sync()
+                    time.sleep(0.001)  # FPS control (1000 Hz)
                 except Exception as e:
                     print(f"[Viewer Thread] Error: {e}")
                     break
