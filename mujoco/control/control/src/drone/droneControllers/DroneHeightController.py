@@ -64,24 +64,37 @@ class DroneHeightController(threading.Thread):
         self._historyVelocityRef = []
 
         self._debugging = False
+        self._timeDebugging = True
 
     def run(self):
-        rotorForce = 0.0
-        integralVelocityError = 0.0
-        derivativeVelocityError = 0.0
-        previousVelocityError = 0.0
-        previousTimestampPID = 0.0
-        previousTimestampP = 0.0
-        dtPID = 0.002
-        dtP = 0.01
         print("[DroneHeightController] Initialized.")
         iteration = 0
         gravity = 9.81
         mass = 4.5  # Mass of the drone in kg
         MAX_VEL = 2.0  # Maximum ascension velocity in m/s
+        rotorForce = 0.0
+        integralVelocityError = 0.0
+        derivativeVelocityError = 0.0
+        previousVelocityError = 0.0
+
+        PID_PERIOD = 0.002
+        P_PERIOD = 0.01
+
+        self.updateHeightController()
+        lastTimeP = self._currentTimestamp
+        lastTimePID = self._currentTimestamp
+
+        previousTimestampPID = 0.0
+        previousTimestampP = 0.0
+        dtPID = PID_PERIOD
+        dtP = P_PERIOD
 
         while not self._shutdownEvent.is_set():
-            debug = self._debugging and iteration % 100 == 0
+            # now = time.perf_counter()
+            now = self._currentTimestamp
+            debug = self._debugging and iteration % 200 == 0
+            timeDebug = self._timeDebugging and iteration % 200 == 0
+
             self.updateHeightController()
 
             if debug:
@@ -90,7 +103,7 @@ class DroneHeightController(threading.Thread):
                 )
                 print("[DroneHeightController] Height data updated.")
 
-            if iteration == 1 or iteration % 10 == 0:
+            if iteration == 0 or now - lastTimeP >= P_PERIOD:
                 # Height controller: P controller whose output is the target ascension velocity.
                 # Will execute with a frequency of f = 100 Hz (given that timestep = 0.001). Therefore, dtP = 0.01
 
@@ -98,23 +111,24 @@ class DroneHeightController(threading.Thread):
                 targetVelocity = np.clip(self._pKp * heightError, -MAX_VEL, MAX_VEL)
                 dtP = self._currentTimestamp - previousTimestampP
                 previousTimestampP = self._currentTimestamp
+                lastTimeP += P_PERIOD
 
-            if iteration == 1 or iteration % 2 == 0:
+            if iteration == 0 or now - lastTimePID >= PID_PERIOD:
                 # Velocity controller: PID controller whose output is the base thrust to be applied.
                 # Will execute with a frequency of f = 500 Hz (given that timestep = 0.001). Therefore, dtPID = 0.002
-
+                if dtPID == 0:
+                    dtPID = PID_PERIOD
                 velocityError = targetVelocity - self._currentVelocity[2]
                 derivativeVelocityError = (
                     velocityError - previousVelocityError
                 ) / dtPID
                 integralVelocityError += velocityError * dtPID
                 previousVelocityError = velocityError
-                # dtPID = self._currentTimestamp - previousTimestampPID
-                # previousTimestampPID = self._currentTimestamp
-
-                if debug:
-                    print(f"[DroneHeightController] dtPID: {dtPID}")
-                    print(f"[DroneHeightController] dtP: {dtP}")
+                dtPID = self._currentTimestamp - previousTimestampPID
+                previousTimestampPID = self._currentTimestamp
+                lastTimePID += PID_PERIOD
+                if timeDebug:
+                    print(f"[DroneHeightController] dtPID: {dtPID}, dtP: {dtP}")
 
                 rotorForce = (
                     self._pidKp * velocityError
