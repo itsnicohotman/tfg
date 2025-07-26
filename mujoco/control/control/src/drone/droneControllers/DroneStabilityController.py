@@ -59,30 +59,46 @@ class DroneStabilityController(threading.Thread):
         self._historyTime = []
 
         self._debugging = False  # Set to False to disable debugging output
+        self._timeDebugging = True
 
     def run(self):
         print("[DroneStabilityController] Initialized.")
         previousRateError = np.zeros(3)
         integralRateError = np.zeros(3)
         iteration = 0
-        dtPID = 0.001
-        dtP = 0.004
+
+        PID_PERIOD = 0.001
+        P_PERIOD = 0.004
+
+        self.updateOrientation()
+        lastTimeP = self._currentTimestamp
+        lastTimePID = self._currentTimestamp
+
+        previousTimestampP = 0.0
+        previousTimestampPID = 0.0
+        dtP = P_PERIOD
+        dtPID = PID_PERIOD
 
         while not self._shutdownEvent.is_set():
-            debug = self._debugging and iteration % 100 == 0
-            self.updateOrientation()
+            debug = self._debugging and iteration % 200 == 0
+            timeDebug = self._timeDebugging and iteration % 200 == 0
 
-            if iteration == 1 or iteration % 4 == 0:
+            self.updateOrientation()
+            now = self._currentTimestamp
+
+            if iteration == 0 or now - lastTimeP >= P_PERIOD:
                 # Attitude controller: P controller whose output is the target rate.
                 # Will execute with a frequency of f = 250 Hz (given that timestep = 0.001). Therefore, dtP = 0.004.
 
-                previousTimeP = self._currentTimestamp
                 # Convert quaternion to Euler angles (roll, pitch, yaw) - in radians
                 currentAngles = np.array(
                     self.quaternionToEuler(self._currentOrientation)
                 )
                 angleError = self._currentTargetAngles - currentAngles
                 targetRate = self._pKp * angleError
+                dtP = self._currentTimestamp - previousTimestampP
+                previousTimestampP = self._currentTimestamp
+                lastTimeP += P_PERIOD
             if debug:
                 print(
                     f"[DroneStabilityController] iteration: {iteration}, current timestamp: {self._currentTimestamp}"
@@ -96,17 +112,27 @@ class DroneStabilityController(threading.Thread):
 
             # Rate controller: PID controller whose output is the torques to be applied.
             # Will execute with a frequency of f = 1000 Hz (given that timestep = 0.001). Therefore, dtPID = 0.001.
+            if dtPID == 0:
+                dtPID = PID_PERIOD
 
             rateError = targetRate - self._currentAngularVelocity
             derivativeError = (rateError - previousRateError) / dtPID
             integralRateError += rateError * dtPID
             previousRateError = rateError
+
+            dtPID = self._currentTimestamp - previousTimestampPID
+            previousTimestampPID = self._currentTimestamp
+            lastTimePID += PID_PERIOD
+
             controlOutput = (
                 self._pidKp * rateError
                 + self._pidKi * integralRateError
                 + self._pidKd * derivativeError
             )
             u_roll, u_pitch, u_yaw = controlOutput
+
+            if timeDebug:
+                print(f"[DroneHeightController] dtPID: {dtPID}, dtP: {dtP}")
 
             # Mixer for rotor forces based on roll/pitch/yaw adjustments
             rotorAdjustments = [
