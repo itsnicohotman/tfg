@@ -56,7 +56,7 @@ class MujocoSimulation(threading.Thread):
         }
         self._droneController = droneController
 
-        self._debug = False
+        self._timeDebugging = False
 
     def run(self):
         print("[MujocoSimulation] Initialized.")
@@ -80,14 +80,11 @@ class MujocoSimulation(threading.Thread):
 
         while not self._shutdownEvent.is_set():
             tStart = time.perf_counter()
-            # t0 = time.time()
+            timeDebug = self._timeDebugging and iteration % 200 == 0
+            if timeDebug:
+                t0 = time.time()
             iteration += 1
-            debugging = self._debug and iteration % 100 == 0
 
-            # Simulation step: timestep = 0.001s
-            mujoco.mj_step(self._model, self._data)
-
-            # t1 = time.time()
             # iteration = self.testDroneControl(droneID, iteration)
 
             # Get sensor data and send to DroneControl thread
@@ -110,7 +107,8 @@ class MujocoSimulation(threading.Thread):
             self._droneController.setSensorData(sensorDataMessage)
 
             # Get control output from DroneControl thread
-            # t2 = time.time()
+            if timeDebug:
+                t1 = time.time()
             try:
                 controlAction: ControlAction = self._droneController.getControlInputs()
                 allControlActions = {**controlAction.droneThrusters}
@@ -123,7 +121,16 @@ class MujocoSimulation(threading.Thread):
             except queue.Empty:
                 pass
 
-                # t3 = time.time()
+            if timeDebug:
+                t2 = time.time()
+
+            # Simulation step: timestep = 0.001s
+            mujoco.mj_step(self._model, self._data)
+            if not self._droneController._updateEvent.is_set():
+                self._droneController.setUpdateEvent()
+
+            if timeDebug:
+                t3 = time.time()
 
             # Maintain a constant simulation period.
             tFinal = time.perf_counter()
@@ -133,7 +140,7 @@ class MujocoSimulation(threading.Thread):
             now = time.perf_counter()
             sleepDuration = nextTime - now
 
-            if debugging:
+            if timeDebug:
                 real_elapsed = time.time() - real_start
                 sim_elapsed = self._data.time - sim_start
 
@@ -143,13 +150,13 @@ class MujocoSimulation(threading.Thread):
                 print(
                     f"[MujocoSimulation] Sim Time: {sim_elapsed:.2f} s, Real Time: {real_elapsed:.2f} s"
                 )
-                # elapsedRecvControl = t3 - t2
-                # elapsedSendData = t2 - t1
-                # elapsedStep = t1 - t0
-                # elapsedTotal = t3 - t0
-                # print(
-                #     f"[MujcoSimulation] Step: {elapsedStep:.6f}, recv control: {elapsedRecvControl:.6f}, send sensors: {elapsedSendData:.6f}, TOTAL: {elapsedTotal}"
-                # )
+                elapsedRecvControl = t2 - t1
+                elapsedSendData = t1 - t0
+                elapsedStep = t3 - t2
+                elapsedTotal = t3 - t0
+                print(
+                    f"[MujcoSimulation] Step: {elapsedStep:.6f}, recv control: {elapsedRecvControl:.6f}, send sensors: {elapsedSendData:.6f}, TOTAL: {elapsedTotal}"
+                )
 
             if sleepDuration > 0.0001:
                 time.sleep(sleepDuration - 0.00005)  # Sleeps most of the time
@@ -158,7 +165,7 @@ class MujocoSimulation(threading.Thread):
             while time.perf_counter() < nextTime:
                 pass
 
-            if debugging:
+            if timeDebug:
                 totalCycle = time.perf_counter() - tStart
                 print(f"[MujocoSimulation] Total Cycle: {totalCycle}.")
 
