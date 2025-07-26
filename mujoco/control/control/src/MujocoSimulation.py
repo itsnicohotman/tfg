@@ -16,10 +16,6 @@ from src.drone.DroneControl import DroneControl
 class MujocoSimulation(threading.Thread):
     def __init__(
         self,
-        # sensorQueue: queue.Queue,
-        controlQueue: queue.Queue,
-        # sendSensorsEvent: threading.Event,
-        recvControlEvent: threading.Event,
         shutdownEvent: threading.Event,
         model,
         droneController: DroneControl,
@@ -50,8 +46,6 @@ class MujocoSimulation(threading.Thread):
 
         self._model = mujoco.MjModel.from_xml_path(MODEL_PATH)
         self._data = mujoco.MjData(self._model)
-        self._controlQueue = controlQueue
-        self._recvControlEvent = recvControlEvent
         self._shutdownEvent = shutdownEvent
         self._viewer = None
         self._viewerThread = None
@@ -90,7 +84,7 @@ class MujocoSimulation(threading.Thread):
             iteration += 1
             debugging = self._debug and iteration % 100 == 0
 
-            # Simulation step. 0.001s
+            # Simulation step: timestep = 0.001s
             mujoco.mj_step(self._model, self._data)
 
             # t1 = time.time()
@@ -117,11 +111,8 @@ class MujocoSimulation(threading.Thread):
 
             # Get control output from DroneControl thread
             # t2 = time.time()
-
-            self._recvControlEvent.wait(timeout=0.0001)
-            # t21 = time.time()
             try:
-                controlAction: ControlAction = self._controlQueue.get_nowait()
+                controlAction: ControlAction = self._droneController.getControlInputs()
                 allControlActions = {**controlAction.droneThrusters}
                 for name, value in allControlActions.items():
                     if name in self._actuatorsIDs:
@@ -129,7 +120,6 @@ class MujocoSimulation(threading.Thread):
                     else:
                         print(f"[WARNING] Actuator '{name}' not found in model.")
 
-                self._recvControlEvent.clear()
             except queue.Empty:
                 pass
 
@@ -154,12 +144,11 @@ class MujocoSimulation(threading.Thread):
                     f"[MujocoSimulation] Sim Time: {sim_elapsed:.2f} s, Real Time: {real_elapsed:.2f} s"
                 )
                 # elapsedRecvControl = t3 - t2
-                # elapsedRecvControlNoWait = t3 - t21
-                # elapsedSendData = t2 - t05
-                # elapsedStep = t05 - t0
+                # elapsedSendData = t2 - t1
+                # elapsedStep = t1 - t0
                 # elapsedTotal = t3 - t0
                 # print(
-                #     f"[MujcoSimulation] Step: {elapsedStep:.6f}, recv control: {elapsedRecvControl:.6f},recv control without Wait: {elapsedRecvControlNoWait:.6f}, send sensors: {elapsedSendData:.6f}, TOTAL: {elapsedTotal}"
+                #     f"[MujcoSimulation] Step: {elapsedStep:.6f}, recv control: {elapsedRecvControl:.6f}, send sensors: {elapsedSendData:.6f}, TOTAL: {elapsedTotal}"
                 # )
 
             if sleepDuration > 0.0001:

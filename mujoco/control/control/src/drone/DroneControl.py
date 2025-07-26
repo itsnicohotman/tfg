@@ -14,14 +14,11 @@ class DroneControl(threading.Thread):
         self,
         shutdownEvent: threading.Event,
         maneuverEvent: threading.Event,
-        recvControlEvent: threading.Event,
-        controlQueue: queue.Queue,
         droneControlQueue: queue.Queue,
     ):
         super().__init__()
         self._taskManagerManeuverEvent = maneuverEvent
         self._shutdownEvent = shutdownEvent
-        self._recvControlEvent = recvControlEvent
 
         # Height Controller
         self._heightControllerUpdateEvent = threading.Event()
@@ -97,13 +94,13 @@ class DroneControl(threading.Thread):
         self._sensorData: SensorData
         self._sensorLock = threading.Lock()
         self._controlAction = ControlAction(droneThrusters={})
+        self._controlLock = threading.Lock()
         self._controlMessage: ControlMessage
         self._previousControlMessage = ControlMessage(
             grasp=False, referenceX=0.0, referenceY=0.0, referenceZ=0.45
         )
 
         self._droneControlQueue = droneControlQueue  # receives from TaskManager Thread
-        self._controlQueue = controlQueue  # sends to MuJoCo Simulation Thread
 
         self._lastCheckTime = None
         self._reachedReferences = False
@@ -139,8 +136,6 @@ class DroneControl(threading.Thread):
             self.combineControllersOutputs()
             self.checkReachedReferences()
 
-            self.sendControlInputs()
-
             iteration += 1
             self._debug = self._debugging and iteration % 300 == 0
 
@@ -165,16 +160,6 @@ class DroneControl(threading.Thread):
             self._previousControlMessage = self._controlMessage
         except queue.Empty:
             self._controlMessage = self._previousControlMessage
-
-    def setSensorData(self, sensorData: SensorData):
-        with self._sensorLock:
-            self._sensorData = sensorData
-
-    def sendControlInputs(self):
-        while self._recvControlEvent.is_set():
-            continue
-        self._controlQueue.put(self._controlAction)
-        self._recvControlEvent.set()
 
     def updateCurrentState(self):
         with self._sensorLock:
@@ -272,12 +257,15 @@ class DroneControl(threading.Thread):
             MIN_CONTROL_INPUT,
         )
 
-        self._controlAction.droneThrusters = {
+        droneThrusters = {
             "propeller-1_motor": thrust1,  # Front-left - CW
             "propeller-2_motor": thrust2,  # Front-right - CCW
             "propeller-3_motor": thrust3,  # Back-right - CW
             "propeller-4_motor": thrust4,  # Back-left - CCW
         }
+
+        with self._controlLock:
+            self._controlAction.droneThrusters = droneThrusters
 
     def checkReachedReferences(self):
         heightReferenceReached = self._heightController.getReachedReference()
@@ -296,3 +284,12 @@ class DroneControl(threading.Thread):
                 f"[DroneControl] Position reference reached: {positionReferenceReached}"
             )
             print(f"[DroneControl] Height reference reached: {heightReferenceReached}")
+
+    # Accessed from MujocoSimulation thread.
+    def setSensorData(self, sensorData: SensorData):
+        with self._sensorLock:
+            self._sensorData = sensorData
+
+    def getControlInputs(self):
+        with self._controlLock:
+            return self._controlAction
