@@ -92,75 +92,71 @@ class CoordinatesController(threading.Thread):
         self._historyRefAngles = []
 
         self._debugging = False
-        self._debug = False
+        self._timeDebugging = False
 
     def run(self):
         print("[DroneCoordinatesController] Initialized.")
         iteration = 0
         previousTime = 0
 
-        dt = 0.02
+        PERIOD = 0.02
+        nextTime = time.perf_counter()
 
         while not self._shutdownEvent.is_set():
-            self._debug = self._debugging and iteration % 300 == 0
+            debug = self._debugging and iteration % 300 == 0
+            timeDebug = self._timeDebugging and iteration % 300 == 0
 
             iteration += 1
             self.updateState()
 
             currentTime = self._currentTimestamp
             dt = currentTime - previousTime if previousTime > 0 else self._timestep
+            if dt <= 0:
+                dt = self._timestep
             previousTime = currentTime
 
-            if iteration == 1 or iteration % 20 == 0:
-                targetVelocity = np.zeros(3)
-                # Coordinates controller: P controller whose output is the target velocity to the new position.
-                # Will execute with a frequency of f = 50 Hz (given that timestep = 0.001). dt = 0.02
-                errorPosition = self._currentTargetPosition - self._currentPosition
-                mask = np.abs(errorPosition) > 0.1
-                targetVelocity[mask] = self._currentTargetVelocity[mask] * np.sign(
-                    errorPosition[mask]
-                )
+            targetVelocity = np.zeros(3)
+            # Coordinates controller: P controller whose output is the target velocity to the new position.
+            # Will execute with a frequency of f = 50 Hz (given that timestep = 0.001). dt = 0.02
+            errorPosition = self._currentTargetPosition - self._currentPosition
+            mask = np.abs(errorPosition) > 0.1
+            targetVelocity[mask] = self._currentTargetVelocity[mask] * np.sign(
+                errorPosition[mask]
+            )
 
-                desiredVelocity = (
-                    self._positionPID.compute(error=errorPosition, dt=dt)
-                    + targetVelocity
-                )
+            desiredVelocity = (
+                self._positionPID.compute(error=errorPosition, dt=dt) + targetVelocity
+            )
 
-                # Velocity controller: PID controller whose output is the target acceleration.
-                # Will execute with a frequency of f = 50 Hz (given that timestep = 0.001). dt = 0.02
-                errorVelocity = desiredVelocity - self._currentVelocity
-                desiredAcceleration = np.array(
-                    self._velocityPID.compute(error=errorVelocity, dt=dt)
-                )
+            # Velocity controller: PID controller whose output is the target acceleration.
+            # Will execute with a frequency of f = 50 Hz (given that timestep = 0.001). dt = 0.02
+            errorVelocity = desiredVelocity - self._currentVelocity
+            desiredAcceleration = np.array(
+                self._velocityPID.compute(error=errorVelocity, dt=dt)
+            )
 
-                # Acceleration controller: PID controller whose output are the reference Euler angles for the stability controller
-                # Will execute with a frequency of f = 50 Hz (given that timestep = 0.001). dt = 0.02
+            # Acceleration controller: PID controller whose output are the reference Euler angles for the stability controller
+            # Will execute with a frequency of f = 50 Hz (given that timestep = 0.001). dt = 0.02
 
-                referenceEulerAngles = self.computeAttitude(
-                    desiredAcceleration=desiredAcceleration
-                )
+            referenceEulerAngles = self.computeAttitude(
+                desiredAcceleration=desiredAcceleration
+            )
 
-                reachedReference = self.checkReachedReferences(
-                    positionError=errorPosition[:2],
-                    velocityError=errorVelocity[:2],
-                )
+            reachedReference = self.checkReachedReferences(
+                positionError=errorPosition[:2],
+                velocityError=errorVelocity[:2],
+            )
 
-                with self._coordinatesResultsLock:
-                    self._refAngles = np.array(referenceEulerAngles)
-                    self._reachedReference = reachedReference
+            with self._coordinatesResultsLock:
+                self._refAngles = np.array(referenceEulerAngles)
+                self._reachedReference = reachedReference
 
-            if self._debug:
+            if debug:
                 print(
-                    f"[DroneCoordinatesController] Current Position: {self._currentPosition}"
+                    f"[DroneCoordinatesController] Current Position: {self._currentPosition}, Target Position: {self._currentTargetPosition}"
                 )
                 print(
-                    f"[DroneCoordinatesController] Target Position: {self._currentTargetPosition}"
-                )
-                print(
-                    f"[DroneCoordinatesController] Desired Velocity: {desiredVelocity}"
-                )
-                print(
-                    f"[DroneCoordinatesController] Desired Acceleration: {desiredAcceleration}"
+                    f"[DroneCoordinatesController] Desired Velocity: {desiredVelocity}, Desired Acceleration: {desiredAcceleration}"
                 )
                 print(
                     f"[DroneCoordinatesController] Ref. Angles: {referenceEulerAngles}"
@@ -170,6 +166,8 @@ class CoordinatesController(threading.Thread):
                     print(
                         "[DroneCoordinatesController] Position reference reached and stable."
                     )
+            if timeDebug:
+                print(f"[DroneCoordinatesController] dt: {dt}")
 
             # Store for analysis
             self._historyTime.append(self._currentTimestamp)
@@ -180,6 +178,15 @@ class CoordinatesController(threading.Thread):
             self._historyReferenceAcceleration.append(desiredAcceleration.tolist())
             self._historyCurrentAcceleration.append(self._currentAcceleration.tolist())
             self._historyRefAngles.append(self._refAngles.tolist())
+
+            nextTime += PERIOD
+            sleepDuration = nextTime - time.perf_counter()
+            if sleepDuration > 0.0001:
+                time.sleep(sleepDuration - 0.00005)  # Sleeps most of the time
+
+            # Busy-wait the last ~50 µs
+            while time.perf_counter() < nextTime:
+                pass
 
         self.graphErrors()
 
