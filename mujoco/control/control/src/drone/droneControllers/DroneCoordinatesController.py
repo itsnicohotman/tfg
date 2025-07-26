@@ -31,10 +31,10 @@ class CoordinatesController(threading.Thread):
         self._coordinatesData = coordinatesData
 
         # Position -> Velocity PID Controller
-        pKp = np.array([3, 3, 0.0], dtype=np.float64)  # Kp for x, y [3 3 0]
-        pKi = np.array([2.3, 2.3, 0.0], dtype=np.float64)  # Ki for x, y [2.3 2.3 0]
-        pKd = np.array([0.08, 0.08, 0.0], dtype=np.float64)  # Kd for x, y [0.05 0.05 0]
-        self._MAX_VEL = 1.0
+        pKp = np.array([2, 2, 0.0], dtype=np.float64)  # Kp for x, y [2 2 0]
+        pKi = np.array([2, 2, 0.0], dtype=np.float64)  # Ki for x, y [2 2 0]
+        pKd = np.array([0.5, 0.5, 0.0], dtype=np.float64)  # Kd for x, y [0.5 0.5 0]
+        self._MAX_VEL = 0.75
         self._positionPID = PIDController(
             kp=pKp,
             ki=pKi,
@@ -43,12 +43,14 @@ class CoordinatesController(threading.Thread):
         )
 
         # Velocity -> Acceleration PID Controller
-        vKp = np.array([4, 4, 0.0], dtype=np.float64)  # Kp for x, y velocities [4 4 0]
+        vKp = np.array(
+            [10, 10, 0.0], dtype=np.float64
+        )  # Kp for x, y velocities [10 10 0]
         vKi = np.array([5, 5, 0.0], dtype=np.float64)  # Ki for x, y velocities [5 5 0]
         vKd = np.array(
             [0.0085, 0.0085, 0.0], dtype=np.float64
         )  # Kd for x, y velocities [0.0085 0.0085 0]
-        self._MAX_ACCEL = 2.0
+        self._MAX_ACCEL = 1.0
         self._velocityPID = PIDController(
             kp=vKp,
             ki=vKi,
@@ -115,18 +117,11 @@ class CoordinatesController(threading.Thread):
                 dt = self._timestep
             previousTime = currentTime
 
-            targetVelocity = np.zeros(3)
             # Coordinates controller: P controller whose output is the target velocity to the new position.
             # Will execute with a frequency of f = 50 Hz (given that timestep = 0.001). dt = 0.02
             errorPosition = self._currentTargetPosition - self._currentPosition
-            mask = np.abs(errorPosition) > 0.1
-            targetVelocity[mask] = self._currentTargetVelocity[mask] * np.sign(
-                errorPosition[mask]
-            )
 
-            desiredVelocity = (
-                self._positionPID.compute(error=errorPosition, dt=dt) + targetVelocity
-            )
+            desiredVelocity = self._positionPID.compute(error=errorPosition, dt=dt)
 
             # Velocity controller: PID controller whose output is the target acceleration.
             # Will execute with a frequency of f = 50 Hz (given that timestep = 0.001). dt = 0.02
@@ -201,12 +196,14 @@ class CoordinatesController(threading.Thread):
         MAX_PITCH = 0.52  # 30 degrees in radians
         gravity = 9.81
         desiredAcceleration[2] = gravity
+        droneMass = 4.65
+        desiredThrust = desiredAcceleration / droneMass
 
         yaw = 0  # Assume no yaw change for simplicity
 
-        pitch = np.arcsin(desiredAcceleration[0] / np.linalg.norm(desiredAcceleration))
+        pitch = np.arcsin(desiredThrust[0] / np.linalg.norm(desiredThrust))
         pitch = np.clip(pitch, -MAX_PITCH, MAX_PITCH)
-        roll = np.arcsin(-desiredAcceleration[1] / np.linalg.norm(desiredAcceleration))
+        roll = np.arcsin(-desiredThrust[1] / np.linalg.norm(desiredThrust))
         roll = np.clip(roll, -MAX_ROLL, MAX_ROLL)
 
         referenceAngles = np.array([roll, pitch, yaw], dtype=np.float64)
