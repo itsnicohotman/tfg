@@ -153,11 +153,11 @@ class DroneControl(threading.Thread):
 
     def getControlMessage(self):
         self._taskManagerManeuverEvent.wait(timeout=0.001)
-        if self._debug:
-            print("Control Message received")
         try:
             self._controlMessage = self._droneControlQueue.get(timeout=0.001)
             self._previousControlMessage = self._controlMessage
+            if self._debug:
+                print("Control Message received")
         except queue.Empty:
             self._controlMessage = self._previousControlMessage
 

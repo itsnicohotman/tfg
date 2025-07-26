@@ -79,7 +79,6 @@ class DroneHeightController(threading.Thread):
         gravity = 9.81
         mass = 4.5  # Mass of the drone in kg
         MAX_VEL = 2.0  # Maximum ascension velocity in m/s
-        self._historyStartTime = time.time()
 
         while not self._shutdownEvent.is_set():
             debug = self._debugging and iteration % 100 == 0
@@ -135,13 +134,14 @@ class DroneHeightController(threading.Thread):
             reachedReference = self.checkReachedReferences(heightError, velocityError)
             if debug:
                 print(f"[DroneHeightController] reachedReference: {reachedReference}")
+                if reachedReference:
+                    print(
+                        "[DroneHeightController] Height reference reached and stable."
+                    )
 
             with self._heightResultsLock:
                 self._rotorForce = rotorForce
                 self._reachedReference = reachedReference
-
-            if iteration % 100 == 0 and reachedReference:
-                print("[DroneHeightController] Height reference reached and stable.")
 
             # Store for analysis
             self._historyHeightReference.append(self._heightReference)
@@ -154,7 +154,6 @@ class DroneHeightController(threading.Thread):
             self._historyVelocityRef.append(targetVelocity)
 
             iteration += 1
-        self._historyEndTime = time.time()
         self.graphControlProcess()
 
     def stop(self):
@@ -203,9 +202,6 @@ class DroneHeightController(threading.Thread):
                     self._inToleranceSince = time.time()
                 elif (time.time() - self._inToleranceSince) >= self._stabilityTime:
                     reachedReference = True
-                    """ print(
-                        "[DroneHeightController] Height reference reached and stable."
-                    ) """
             else:
                 self._inToleranceSince = None
         return reachedReference
@@ -223,13 +219,7 @@ class DroneHeightController(threading.Thread):
         os.makedirs(output_dir, exist_ok=True)
         matplotlib.use("Agg")
 
-        # Scaling: real time / simulated time
-        time_sim = np.array(self._historyTime)
-        real_duration = self._historyTime[-1] - self._historyTime[0]
-        wall_clock_duration = self._historyEndTime - self._historyStartTime
-        scale_factor = wall_clock_duration / real_duration if real_duration > 0 else 1.0
-        time = (time_sim - time_sim[0]) * scale_factor
-
+        time = np.array(self._historyTime)
         historyHeight = np.array(self._historyCurrentHeight)
         historyHeightReference = np.array(self._historyHeightReference)
         historyVelocity = np.array(self._historyVelocity)

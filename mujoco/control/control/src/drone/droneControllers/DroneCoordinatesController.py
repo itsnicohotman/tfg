@@ -97,7 +97,6 @@ class CoordinatesController(threading.Thread):
     def run(self):
         print("[DroneCoordinatesController] Initialized.")
         iteration = 0
-        self._historyStartTime = time.time()
         previousTime = 0
 
         dt = 0.02
@@ -182,7 +181,6 @@ class CoordinatesController(threading.Thread):
             self._historyCurrentAcceleration.append(self._currentAcceleration.tolist())
             self._historyRefAngles.append(self._refAngles.tolist())
 
-        self._historyEndTime = time.time()
         self.graphErrors()
 
     def stop(self):
@@ -268,9 +266,6 @@ class CoordinatesController(threading.Thread):
                     self._inToleranceSince = time.time()
                 elif (time.time() - self._inToleranceSince) >= self._stabilityTime:
                     reachedReference = True
-                    print(
-                        "[DroneCoordinatesController] Position reference reached and stable."
-                    )
                     self._positionPID.reset()
                     self._velocityPID.reset()
             else:
@@ -298,14 +293,7 @@ class CoordinatesController(threading.Thread):
         os.makedirs(output_dir, exist_ok=True)
         matplotlib.use("Agg")
 
-        # Scaling: real time / simulated time
-        time_sim = np.array(self._historyTime)
-        real_duration = self._historyTime[-1] - self._historyTime[0]
-        wall_clock_duration = self._historyEndTime - self._historyStartTime
-        scale_factor = wall_clock_duration / real_duration if real_duration > 0 else 1.0
-        time = (time_sim - time_sim[0]) * scale_factor
-
-        # Coordinates graph
+        time = np.array(self._historyTime)
         lengthTime = len(time)
         historyPosition = np.array(self._historyCurrentPosition[:lengthTime])
         historyPositionReference = np.array(self._historyReferencePosition[:lengthTime])

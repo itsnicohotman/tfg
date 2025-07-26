@@ -67,7 +67,6 @@ class DroneStabilityController(threading.Thread):
         iteration = 0
         dtPID = 0.001
         dtP = 0.004
-        self._historyStartTime = time.time()
 
         while not self._shutdownEvent.is_set():
             debug = self._debugging and iteration % 100 == 0
@@ -140,7 +139,6 @@ class DroneStabilityController(threading.Thread):
 
             iteration += 1
 
-        self._historyEndTime = time.time()
         self.graphErrors()
 
     def updateOrientation(self):
@@ -177,16 +175,7 @@ class DroneStabilityController(threading.Thread):
         os.makedirs(output_dir, exist_ok=True)
         matplotlib.use("Agg")
 
-        time_sim = np.array(self._historyTime)
-        # Scaling: real time / simulated time
-        real_duration = self._historyTime[-1] - self._historyTime[0]
-        wall_clock_duration = self._historyEndTime - self._historyStartTime
-        scale_factor = wall_clock_duration / real_duration if real_duration > 0 else 1.0
-        time = (time_sim - time_sim[0]) * scale_factor
-
-        if not self._historyTime or not self._historyRotorAdjustments:
-            return
-
+        time = np.array(self._historyTime)
         rateErrors = np.array(self._historyRateError)
         angleErrors = np.array(self._historyAngleError)
         targetRate = np.array(self._historyTargetRate)
