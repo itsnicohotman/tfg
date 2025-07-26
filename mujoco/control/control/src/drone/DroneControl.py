@@ -20,6 +20,8 @@ class DroneControl(threading.Thread):
         self._taskManagerManeuverEvent = maneuverEvent
         self._shutdownEvent = shutdownEvent
 
+        self._updateEvent = threading.Event()
+
         # Height Controller
         self._heightControllerUpdateEvent = threading.Event()
         self._heightControllerUpdateEvent.clear()
@@ -91,7 +93,7 @@ class DroneControl(threading.Thread):
             dronePosition=[0.0, 0.0, 0.45],
             manipulatorPosition=[0.0, 0.0, 0.0],
         )
-        self._sensorData: SensorData
+        self._sensorData: SensorData = None
         self._sensorLock = threading.Lock()
         self._controlAction = ControlAction(droneThrusters={})
         self._controlLock = threading.Lock()
@@ -121,23 +123,41 @@ class DroneControl(threading.Thread):
 
         self._debugging = False
         self._debug = False
+        self._timeDebugging = False
 
     def run(self):
         print("[DroneControl] Initialized.")
         iteration = 0
+
+        nextTime = time.perf_counter()
         while not self._shutdownEvent.is_set():
+            tStart = time.time()
             self.getControlMessage()
             self.updateCurrentState()
 
             self.updateCoordinatesController()
-
             self.updateHeightController()
             self.updateStabilityController()
+
             self.combineControllersOutputs()
             self.checkReachedReferences()
 
             iteration += 1
             self._debug = self._debugging and iteration % 300 == 0
+
+            # Sincronización precisa
+            nextTime += self._timestep
+            sleepDuration = nextTime - time.perf_counter()
+            if sleepDuration > 0:
+                time.sleep(sleepDuration)
+            else:
+                # Si el procesamiento tarda más de 1 ms, ajusta el siguiente ciclo
+                nextTime = time.perf_counter()
+
+            if self._timeDebugging:
+                dtReal = time.time() - tStart
+                dtSim = self._currentTimestamp - self._previousTimestamp
+                print(f"[DroneControl] dtSim: {dtSim}, dtReal: {dtReal}")
 
         print("[DroneControl] Shutting down.")
 
@@ -152,44 +172,54 @@ class DroneControl(threading.Thread):
         self._shutdownEvent.set()
 
     def getControlMessage(self):
-        self._taskManagerManeuverEvent.wait(timeout=0.001)
-        try:
-            self._controlMessage = self._droneControlQueue.get(timeout=0.001)
-            self._previousControlMessage = self._controlMessage
-            if self._debug:
-                print("Control Message received")
-        except queue.Empty:
+        # self._taskManagerManeuverEvent.wait(timeout=0.001)
+        if self._taskManagerManeuverEvent.is_set():
             self._controlMessage = self._previousControlMessage
+        else:
+            try:
+                self._controlMessage = self._droneControlQueue.get(timeout=0.001)
+                self._previousControlMessage = self._controlMessage
+                if self._debug:
+                    print("Control Message received")
+            except queue.Empty:
+                self._controlMessage = self._previousControlMessage
 
     def updateCurrentState(self):
-        with self._sensorLock:
-            sensorData = self._sensorData
-        self._previousTimestamp = self._currentTimestamp
-        self._currentTimestamp = sensorData.timestamp
-        self._timestep = sensorData.timestep
-        self._currentPosition = np.array(sensorData.dronePosition)
-        self._currentAcceleration = np.array(sensorData.sensorValues["body_linacc"])
-        self._currentAngularVelocity = np.array(sensorData.sensorValues["body_gyro"])
-        self._currentOrientation = np.array(sensorData.sensorValues["body_quat"])
-        self._currentCOM = np.array(sensorData.sensorValues["drone_load_com"])
-        self._currentVelocity = np.array(sensorData.sensorValues["body_vel"])
-        self._currentTargetPosition = np.array(
-            [
-                self._controlMessage.referenceX,
-                self._controlMessage.referenceY,
-                self._controlMessage.referenceZ,
-            ]
-        )
-        if self._currentTargetPosition[0] is None:
-            self._currentTargetPosition[0] = self._currentPosition[0]
-        if self._currentTargetPosition[1] is None:
-            self._currentTargetPosition[1] = self._currentPosition[1]
-        if self._currentTargetPosition[2] is None:
-            self._currentTargetPosition[2] = self._currentPosition[2]
+        self._updateEvent.wait()
+        self._updateEvent.clear()
+        if self._sensorData is not None:
+            with self._sensorLock:
+                sensorData = self._sensorData
+            self._previousTimestamp = self._currentTimestamp
+            self._currentTimestamp = sensorData.timestamp
+            self._timestep = sensorData.timestep
+            self._currentPosition = np.array(sensorData.dronePosition)
+            self._currentAcceleration = np.array(sensorData.sensorValues["body_linacc"])
+            self._currentAngularVelocity = np.array(
+                sensorData.sensorValues["body_gyro"]
+            )
+            self._currentOrientation = np.array(sensorData.sensorValues["body_quat"])
+            self._currentCOM = np.array(sensorData.sensorValues["drone_load_com"])
+            self._currentVelocity = np.array(sensorData.sensorValues["body_vel"])
+            self._currentTargetPosition = np.array(
+                [
+                    self._controlMessage.referenceX,
+                    self._controlMessage.referenceY,
+                    self._controlMessage.referenceZ,
+                ]
+            )
+            if self._currentTargetPosition[0] is None:
+                self._currentTargetPosition[0] = self._currentPosition[0]
+            if self._currentTargetPosition[1] is None:
+                self._currentTargetPosition[1] = self._currentPosition[1]
+            if self._currentTargetPosition[2] is None:
+                self._currentTargetPosition[2] = self._currentPosition[2]
+        else:
+            pass
 
     def updateHeightController(self):
-        while self._heightControllerUpdateEvent.is_set():
-            continue
+        if self._heightControllerUpdateEvent.is_set():
+            return
         heightData = {
             "timestamp": self._currentTimestamp,
             "currentHeight": self._currentPosition[2],
@@ -200,8 +230,8 @@ class DroneControl(threading.Thread):
         self._heightControllerUpdateEvent.set()
 
     def updateStabilityController(self):
-        while self._stabilityUpdateEvent.is_set():
-            continue
+        if self._stabilityUpdateEvent.is_set():
+            return
         with self._stabilityLock:
             self._stabilityData["timestamp"] = self._currentTimestamp
             self._stabilityData["timestep"] = self._timestep
@@ -215,8 +245,8 @@ class DroneControl(threading.Thread):
         self._stabilityUpdateEvent.set()
 
     def updateCoordinatesController(self):
-        while self._coordinatesUpdateEvent.is_set():
-            continue
+        if self._coordinatesUpdateEvent.is_set():
+            return
         coordinatesData = {}
         coordinatesData["timestamp"] = self._currentTimestamp
         coordinatesData["timestep"] = self._timestep
@@ -293,3 +323,6 @@ class DroneControl(threading.Thread):
     def getControlInputs(self):
         with self._controlLock:
             return self._controlAction
+
+    def setUpdateEvent(self):
+        self._updateEvent.set()

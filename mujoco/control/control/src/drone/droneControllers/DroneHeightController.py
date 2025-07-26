@@ -64,7 +64,7 @@ class DroneHeightController(threading.Thread):
         self._historyVelocityRef = []
 
         self._debugging = False
-        self._timeDebugging = True
+        self._timeDebugging = False
 
     def run(self):
         print("[DroneHeightController] Initialized.")
@@ -90,12 +90,11 @@ class DroneHeightController(threading.Thread):
         dtP = P_PERIOD
 
         while not self._shutdownEvent.is_set():
-            # now = time.perf_counter()
-            now = self._currentTimestamp
             debug = self._debugging and iteration % 200 == 0
             timeDebug = self._timeDebugging and iteration % 200 == 0
 
             self.updateHeightController()
+            now = self._currentTimestamp
 
             if debug:
                 print(
@@ -118,15 +117,18 @@ class DroneHeightController(threading.Thread):
                 # Will execute with a frequency of f = 500 Hz (given that timestep = 0.001). Therefore, dtPID = 0.002
                 if dtPID == 0:
                     dtPID = PID_PERIOD
+
                 velocityError = targetVelocity - self._currentVelocity[2]
                 derivativeVelocityError = (
                     velocityError - previousVelocityError
                 ) / dtPID
                 integralVelocityError += velocityError * dtPID
                 previousVelocityError = velocityError
+
                 dtPID = self._currentTimestamp - previousTimestampPID
                 previousTimestampPID = self._currentTimestamp
                 lastTimePID += PID_PERIOD
+
                 if timeDebug:
                     print(f"[DroneHeightController] dtPID: {dtPID}, dtP: {dtP}")
 

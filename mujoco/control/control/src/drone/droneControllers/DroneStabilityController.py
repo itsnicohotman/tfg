@@ -59,7 +59,7 @@ class DroneStabilityController(threading.Thread):
         self._historyTime = []
 
         self._debugging = False  # Set to False to disable debugging output
-        self._timeDebugging = True
+        self._timeDebugging = False
 
     def run(self):
         print("[DroneStabilityController] Initialized.")
@@ -132,7 +132,7 @@ class DroneStabilityController(threading.Thread):
             u_roll, u_pitch, u_yaw = controlOutput
 
             if timeDebug:
-                print(f"[DroneHeightController] dtPID: {dtPID}, dtP: {dtP}")
+                print(f"[DroneStabilityController] dtPID: {dtPID}, dtP: {dtP}")
 
             # Mixer for rotor forces based on roll/pitch/yaw adjustments
             rotorAdjustments = [
