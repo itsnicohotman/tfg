@@ -65,6 +65,7 @@ class MujocoSimulation(threading.Thread):
         self._droneController = droneController
 
     def run(self):
+        print("[MujocoSimulation] Initialized.")
         real_start = time.time()
         sim_start = self._data.time
         self._viewerRunning.set()
@@ -111,8 +112,9 @@ class MujocoSimulation(threading.Thread):
                 manipulatorPosition=manipulatorGlobalPosition,
             )
 
-            self._sensorQueue.put(sensorDataMessage)
-            self._sendSensorsEvent.set()
+            self._droneController.setSensorData(sensorDataMessage)
+            # self._sensorQueue.put(sensorDataMessage)
+            # self._sendSensorsEvent.set()
 
             t2 = time.time()
 

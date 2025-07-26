@@ -1,6 +1,7 @@
 import threading
 import time
 import queue
+import threading
 from src.drone.droneControllers.DroneHeightController import DroneHeightController
 from src.drone.droneControllers.DroneStabilityController import DroneStabilityController
 from src.drone.droneControllers.DroneCoordinatesController import CoordinatesController
@@ -97,6 +98,7 @@ class DroneControl(threading.Thread):
             manipulatorPosition=[0.0, 0.0, 0.0],
         )
         self._sensorData: SensorData
+        self._sensorLock = threading.Lock()
         self._controlAction = ControlAction(droneThrusters={})
         self._controlMessage: ControlMessage
         self._previousControlMessage = ControlMessage(
@@ -181,6 +183,10 @@ class DroneControl(threading.Thread):
             pass
         self._sendSensorsEvent.clear()
 
+    def setSensorData(self, sensorData: SensorData):
+        with self._sensorLock:
+            self._sensorData = sensorData
+
     def sendControlInputs(self):
         while self._recvControlEvent.is_set():
             continue
@@ -188,19 +194,17 @@ class DroneControl(threading.Thread):
         self._recvControlEvent.set()
 
     def updateCurrentState(self):
+        with self._sensorLock:
+            sensorData = self._sensorData
         self._previousTimestamp = self._currentTimestamp
-        self._currentTimestamp = self._sensorData.timestamp
-        self._timestep = self._sensorData.timestep
-        self._currentPosition = np.array(self._sensorData.dronePosition)
-        self._currentAcceleration = np.array(
-            self._sensorData.sensorValues["body_linacc"]
-        )
-        self._currentAngularVelocity = np.array(
-            self._sensorData.sensorValues["body_gyro"]
-        )
-        self._currentOrientation = np.array(self._sensorData.sensorValues["body_quat"])
-        self._currentCOM = np.array(self._sensorData.sensorValues["drone_load_com"])
-        self._currentVelocity = np.array(self._sensorData.sensorValues["body_vel"])
+        self._currentTimestamp = sensorData.timestamp
+        self._timestep = sensorData.timestep
+        self._currentPosition = np.array(sensorData.dronePosition)
+        self._currentAcceleration = np.array(sensorData.sensorValues["body_linacc"])
+        self._currentAngularVelocity = np.array(sensorData.sensorValues["body_gyro"])
+        self._currentOrientation = np.array(sensorData.sensorValues["body_quat"])
+        self._currentCOM = np.array(sensorData.sensorValues["drone_load_com"])
+        self._currentVelocity = np.array(sensorData.sensorValues["body_vel"])
         self._currentTargetPosition = np.array(
             [
                 self._controlMessage.referenceX,
