@@ -26,7 +26,7 @@ class DroneHeightController(threading.Thread):
         self._pidKi = 30.0
         self._pidKd = 0.0
         self._pKp = 3.35
-        self.MAX_CONTROL_INPUT = 40
+        self.MAX_CONTROL_INPUT = 100
         self.MIN_CONTROL_INPUT = 0
         self._rotorForce = 0.0  # Base thrust to be applied to the rotors
 

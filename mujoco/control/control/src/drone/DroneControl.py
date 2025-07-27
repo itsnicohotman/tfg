@@ -267,7 +267,7 @@ class DroneControl(threading.Thread):
             print(f"[DroneControl] Base Thrust: {baseThrust}")
             print(f"[DroneControl] Stability Adjustments: {stabilityRotorAdjustments}")
 
-        MAX_CONTROL_INPUT = 40
+        MAX_CONTROL_INPUT = 100
         MIN_CONTROL_INPUT = 0
 
         thrust1 = max(
@@ -326,3 +326,6 @@ class DroneControl(threading.Thread):
 
     def setUpdateEvent(self):
         self._updateEvent.set()
+
+    def setHeightReference(self, heightReference):
+        self._previousControlMessage.referenceZ = heightReference

@@ -21,28 +21,36 @@ class MujocoSimulation(threading.Thread):
         droneController: DroneControl,
     ):
         super().__init__()  # Start thread
+        self._droneController = droneController
         match model:
             case "drone":
                 MODEL_PATH = "/home/nicolas/tfg/mujoco/model/drone/Model_GRVC_Drone.xml"
                 print("Simulating drone.")
+                self._droneController.setHeightReference(0.45)
             case "0 cable":
                 MODEL_PATH = "/home/nicolas/tfg/mujoco/model/drone/Model_GRVC_Aerial_Manipulator_NoCable.xml"
                 print("Simulating aerial manipulator hanging by 0 cables.")
+                self._droneController.setHeightReference(2)
             case "1 cable":
                 MODEL_PATH = "/home/nicolas/tfg/mujoco/model/drone/Model_GRVC_Aerial_Manipulator_1Cable.xml"
-                print("Simulating aerial manipulator hanging by1 cable.")
+                print("Simulating aerial manipulator hanging by 1 cable.")
+                self._droneController.setHeightReference(2)
             case "2 cable":
                 MODEL_PATH = "/home/nicolas/tfg/mujoco/model/drone/Model_GRVC_Aerial_Manipulator_2Cable.xml"
-                print("Simulating aerial manipulator hanging by2 cables.")
+                print("Simulating aerial manipulator hanging by 2 cables.")
+                self._droneController.setHeightReference(2)
             case "3 cable":
                 MODEL_PATH = "/home/nicolas/tfg/mujoco/model/drone/Model_GRVC_Aerial_Manipulator_3Cable.xml"
                 print("Simulating aerial manipulator hanging by 3 cables.")
+                self._droneController.setHeightReference(2)
             case "4 cable":
                 MODEL_PATH = "/home/nicolas/tfg/mujoco/model/drone/Model_GRVC_Aerial_Manipulator_4Cable.xml"
                 print("Simulating aerial manipulator hanging by 4 cables.")
+                self._droneController.setHeightReference(2)
             case _:
                 MODEL_PATH = "/home/nicolas/tfg/mujoco/model/drone/Model_GRVC_Drone.xml"
                 print("Simulating default model: drone.")
+                self._droneController.setHeightReference(0.45)
 
         self._model = mujoco.MjModel.from_xml_path(MODEL_PATH)
         self._data = mujoco.MjData(self._model)
@@ -54,7 +62,6 @@ class MujocoSimulation(threading.Thread):
         self._actuatorsIDs = {
             self._model.actuator(i).name: i for i in range(self._model.nu)
         }
-        self._droneController = droneController
 
         self._timeDebugging = False
 
@@ -72,12 +79,20 @@ class MujocoSimulation(threading.Thread):
         sensorValues = {}
         droneID = mujoco.mj_name2id(self._model, mujoco.mjtObj.mjOBJ_BODY, "drone")
         droneGlobalPosition = self._data.xpos[droneID]
+        if droneID == -1:
+            raise RuntimeError("Body 'drone' not found in model.")
+
+        actuadoresConIDMenosUno = [k for k, v in self._actuatorsIDs.items() if v == -1]
+        if len(actuadoresConIDMenosUno) > 0:
+            print(f"[ERROR] Actuadores con ID -1: {actuadoresConIDMenosUno}")
+
         """ manipulatorID = mujoco.mj_name2id(self._model, mujoco.mjtObj.mjOBJ_BODY, 'manipulator')
         manipulatorGlobalPosition = self._data.xpos[manipulatorID] """
         iteration = 0
         timestep = self._model.opt.timestep
         nextTime = time.perf_counter()
 
+        time.sleep(0.5)
         while not self._shutdownEvent.is_set():
             tStart = time.perf_counter()
             timeDebug = self._timeDebugging and iteration % 200 == 0
@@ -169,7 +184,7 @@ class MujocoSimulation(threading.Thread):
                 totalCycle = time.perf_counter() - tStart
                 print(f"[MujocoSimulation] Total Cycle: {totalCycle}.")
 
-        print("[MujocoSimulation] Ending simulation.")
+        # print("[MujocoSimulation] Ending simulation.")
         self._viewerRunning.clear()
         self._viewerThread.join()
 

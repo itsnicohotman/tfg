@@ -29,7 +29,7 @@
   
   <worldbody>    
     <!-- Create hte robotic arm following a tree structure from the base link -->
-    <body name="LiCAS_A1" pos="0 0 0.92">
+    <body name="LiCAS_A1" pos="0 0 1.42">
       <freejoint/>
       <!-- Create the geometry and set the physical properties of the manipulator base -->
       <geom name="Shoulder_Pitch_Structure_geom" type="mesh" mesh="Shoulder_Pitch_Structure_mesh" rgba="0.6 0.8 0.8 1"/>
