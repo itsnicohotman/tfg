@@ -92,7 +92,7 @@ class MujocoSimulation(threading.Thread):
         timestep = self._model.opt.timestep
         nextTime = time.perf_counter()
 
-        time.sleep(0.5)
+        time.sleep(1)
         while not self._shutdownEvent.is_set():
             tStart = time.perf_counter()
             timeDebug = self._timeDebugging and iteration % 200 == 0
