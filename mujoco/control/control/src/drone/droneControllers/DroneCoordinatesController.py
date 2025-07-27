@@ -432,7 +432,7 @@ class CoordinatesController(threading.Thread):
             plt.ylabel("Angle [°]")
             plt.legend()
             plt.savefig(os.path.join(output_dir, f"{labelsAngles[i]}_Ref.png"))
-            print(f"[Drone Stability Controller] {labelsAngles[i]}_Ref.png saved")
+            print(f"[Drone Coordinates Controller] {labelsAngles[i]}_Ref.png saved")
 
     @staticmethod
     def normalizeVector(vector):

@@ -163,6 +163,7 @@ class DroneControl(threading.Thread):
 
     def stop(self):
         print("[DroneControl] Shutting down.")
+        self._updateEvent.set()
         self._heightController.stop()
         self._heightController.join()
         self._stabilityController.stop()
