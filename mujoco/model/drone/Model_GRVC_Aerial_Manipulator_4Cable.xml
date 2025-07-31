@@ -2,15 +2,16 @@
 
 <mujoco model="GRVC_Aerial_Manipulator_4Cable">
 
+<extension>
+    <plugin plugin="mujoco.elasticity.cable" />
+  </extension>
+
   <!-- Specify angles in radians. Take inertia parameters from geometry, given body mass. -->
   <compiler angle="radian" coordinate="local" inertiafromgeom="auto"/>
   
   <!--Compiler options: integration method and time step -->
   <option integrator="Euler" timestep="0.001" density="1.204" viscosity="1.8e-5" gravity="0 0 -9.8" />
   <include file="../assets.xml"/>
-  <extension>
-    <plugin plugin="mujoco.elasticity.cable" />
-  </extension>
 
   <visual>
     <map force="0.1" zfar="30"/>

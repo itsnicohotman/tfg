@@ -63,12 +63,16 @@ class MujocoSimulation(threading.Thread):
             self._model.actuator(i).name: i for i in range(self._model.nu)
         }
 
+        self._dataLock = threading.Lock()
+
         self._timeDebugging = False
+        self._debugging = False
 
     def run(self):
         print("[MujocoSimulation] Initialized.")
         real_start = time.time()
-        sim_start = self._data.time
+        with self._dataLock:
+            sim_start = np.copy(self._data.time)
 
         # Start viewer thread
         self._viewerRunning.set()
@@ -78,7 +82,6 @@ class MujocoSimulation(threading.Thread):
         # Initialize key variables
         sensorValues = {}
         droneID = mujoco.mj_name2id(self._model, mujoco.mjtObj.mjOBJ_BODY, "drone")
-        droneGlobalPosition = self._data.xpos[droneID]
         if droneID == -1:
             raise RuntimeError("Body 'drone' not found in model.")
 
@@ -96,10 +99,13 @@ class MujocoSimulation(threading.Thread):
         while not self._shutdownEvent.is_set():
             tStart = time.perf_counter()
             timeDebug = self._timeDebugging and iteration % 200 == 0
+            debug = self._debugging and iteration % 200 == 0
             if timeDebug:
                 t0 = time.time()
             iteration += 1
-
+            with self._dataLock:
+                droneGlobalPosition = np.copy(self._data.xpos[droneID])
+                currentTimestamp = self._data.time
             # iteration = self.testDroneControl(droneID, iteration)
 
             # Get sensor data and send to DroneControl thread
@@ -107,12 +113,15 @@ class MujocoSimulation(threading.Thread):
             for i in range(self._model.nsensor):
                 name = self._model.sensor(i).name
                 dim = int(self._model.sensor(i).dim)
-                sensorValues[name] = self._data.sensordata[index : index + dim]
+                with self._dataLock:
+                    sensorValues[name] = np.copy(
+                        self._data.sensordata[index : index + dim]
+                    )
                 index += dim
 
             manipulatorGlobalPosition = [0, 0, 0]
             sensorDataMessage = SensorData(
-                timestamp=self._data.time,
+                timestamp=currentTimestamp,
                 timestep=self._model.opt.timestep,
                 sensorValues=sensorValues,
                 dronePosition=droneGlobalPosition,
@@ -120,6 +129,8 @@ class MujocoSimulation(threading.Thread):
             )
 
             self._droneController.setSensorData(sensorDataMessage)
+            if debug:
+                print(f"[MujocoSimulation] sensorDataMessage: {sensorDataMessage}")
 
             # Get control output from DroneControl thread
             if timeDebug:
@@ -129,7 +140,12 @@ class MujocoSimulation(threading.Thread):
                 allControlActions = {**controlAction.droneThrusters}
                 for name, value in allControlActions.items():
                     if name in self._actuatorsIDs:
-                        self._data.ctrl[self._actuatorsIDs[name]] = value
+                        if debug:
+                            print(
+                                f"[MujocoSimulation] Actuator: {name}, value: {value}"
+                            )
+                        with self._dataLock:
+                            self._data.ctrl[self._actuatorsIDs[name]] = value
                     else:
                         print(f"[WARNING] Actuator '{name}' not found in model.")
 
@@ -140,7 +156,8 @@ class MujocoSimulation(threading.Thread):
                 t2 = time.time()
 
             # Simulation step: timestep = 0.001s
-            mujoco.mj_step(self._model, self._data)
+            with self._dataLock:
+                mujoco.mj_step(self._model, self._data)
             if not self._droneController._updateEvent.is_set():
                 self._droneController.setUpdateEvent()
 
@@ -157,7 +174,7 @@ class MujocoSimulation(threading.Thread):
 
             if timeDebug:
                 real_elapsed = time.time() - real_start
-                sim_elapsed = self._data.time - sim_start
+                sim_elapsed = currentTimestamp - sim_start
 
                 print(
                     f"[MujocoSimulation] Elapsed Cycle: {elapsedCycle}, Sleep Duration; {sleepDuration}."
@@ -206,7 +223,8 @@ class MujocoSimulation(threading.Thread):
 
         if iteration == 200:
             appliedTorque = np.random.randn() * 10
-            self._data.xfrc_applied[droneID] = [0, 0, 0, appliedTorque, 0, 0]
+            with self._dataLock:
+                self._data.xfrc_applied[droneID] = [0, 0, 0, appliedTorque, 0, 0]
             print(f"Applied torque: {appliedTorque}")
             return 0
         else:
@@ -222,13 +240,22 @@ class MujocoSimulation(threading.Thread):
             self.setViewersCamera(droneID)
             while self._viewerRunning.is_set():
                 try:
-                    self._viewer.sync()
+                    with self._dataLock:
+                        self._viewer.sync()
                     time.sleep(0.001)  # FPS control (1000 Hz)
                 except Exception as e:
                     print(f"[Viewer Thread] Error: {e}")
                     break
 
             self._viewer.close()
+
+    def passive_render_function(self, m, d):
+        with self._dataLock:
+            # Copiamos solo lo que se necesita para el viewer
+            qpos = np.copy(self._data.qpos)
+            ctrl = np.copy(self._data.ctrl)
+            # Se podría hacer más copia si quieres mostrar más info
+        return f"qpos[0]: {qpos[0]:.3f} | ctrl[0]: {ctrl[0]:.3f}"
 
 
 if __name__ == "__main__":
