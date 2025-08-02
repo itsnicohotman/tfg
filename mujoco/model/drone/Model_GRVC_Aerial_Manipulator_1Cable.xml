@@ -47,7 +47,7 @@
         </plugin>
         <joint kind="main" damping="0.05" />
         <geom type="cylinder" size="0.01" rgba="0 0 1 1" condim="1" group="2" mass="0.005" />
-        <site size="0.015" rgba="0 0.5 0 1" group="2" />
+        <site size="0.015" rgba="0 0.5 0 1" group="3" />
       </composite>
       
       <!-- Create the Landing Gear Legs -->
@@ -96,7 +96,8 @@
   <include file="../dualarm/Model_LiCAS_A1.xml"/>
  
   <equality>
-    <weld name="cable_robot_body" body1="cable_B_last" body2="LiCAS_A1" relpose="0.03 0 0 0.7071 0 0.7071 0"/>
+    <weld name="cable_robot_body" site1="cable_S_last" site2="drone_cable_hook_center" solref="0.005 1"
+      solimp="0.9 0.95 0.001 0.001 0.001"/>
   </equality>
   <contact>
     <exclude body1="cable_B_first" body2="drone" />

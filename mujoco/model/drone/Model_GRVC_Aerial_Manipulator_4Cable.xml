@@ -47,7 +47,7 @@
         </plugin>
         <joint kind="main" damping="0.05" />
         <geom type="cylinder" size="0.01" rgba="0 0 1 1" condim="1" group="2" mass="0.005" />
-        <site size="0.015" rgba="0 0.5 0 1" group="2" />
+        <site size="0.015" rgba="0 0.5 0 1" group="3" />
       </composite>
 
       <composite type="cable" prefix="cable2_" curve="s" count="20 1 1" size="0.5" offset="0 -0.06 -0.07" quat="0 -0.7071 0 0.7071" initial="ball">
@@ -58,7 +58,7 @@
         </plugin>
         <joint kind="main" damping="0.05" />
         <geom type="cylinder" size="0.01" rgba="0 0 1 1" condim="1" group="2" mass="0.005" />
-        <site size="0.015" rgba="0 0.5 0 1" group="2" />
+        <site size="0.015" rgba="0 0.5 0 1" group="3" />
       </composite>
 
       <composite type="cable" prefix="cable3_" curve="s" count="20 1 1" size="0.5" offset="0.06 0 -0.07" quat="0 -0.7071 0 0.7071" initial="ball">
@@ -69,7 +69,7 @@
         </plugin>
         <joint kind="main" damping="0.05" />
         <geom type="cylinder" size="0.01" rgba="0 0 1 1" condim="1" group="2" mass="0.005" />
-        <site size="0.015" rgba="0 0.5 0 1" group="2" />
+        <site size="0.015" rgba="0 0.5 0 1" group="3" />
       </composite>
 
       <composite type="cable" prefix="cable4_" curve="s" count="20 1 1" size="0.5" offset="-0.06 0 -0.07" quat="0 -0.7071 0 0.7071" initial="ball">
@@ -80,7 +80,7 @@
         </plugin>
         <joint kind="main" damping="0.05" />
         <geom type="cylinder" size="0.01" rgba="0 0 1 1" condim="1" group="2" mass="0.005" />
-        <site size="0.015" rgba="0 0.5 0 1" group="2" />
+        <site size="0.015" rgba="0 0.5 0 1" group="3" />
       </composite>
       
       <!-- Create the Landing Gear Legs -->
@@ -126,13 +126,17 @@
   </worldbody>
 
   <!-- Manipulator -->
-  <include file="../dualarm/Model_LiCAS_A1.xml"/>
+  <include file="../dualarm/Model_LiCAS_A1_4Cables.xml"/>
  
   <equality>
-    <weld name="cable1_robot_body" body1="cable1_B_last" body2="LiCAS_A1" relpose="0.045 0 0 0.7071 0 0.7071 0" anchor="0 0.12 0"/>
-    <weld name="cable2_robot_body" body1="cable2_B_last" body2="LiCAS_A1" relpose="0.045 0 0 0.7071 0 0.7071 0" anchor="0 -0.12 0"/>
-    <weld name="cable3_robot_body" body1="cable3_B_last" body2="LiCAS_A1" relpose="0.045 0 0 0.7071 0 0.7071 0" anchor="0.07 0 0"/>
-    <weld name="cable4_robot_body" body1="cable4_B_last" body2="LiCAS_A1" relpose="0.045 0 0 0.7071 0 0.7071 0" anchor="-0.07 0 0"/>
+    <weld name="cable1_robot_body" site1="cable1_S_last" site2="drone_cable_hook_left" solref="0.005 1"
+      solimp="0.9 0.95 0.001 0.001 0.001"/>
+      <weld name="cable2_robot_body" site1="cable2_S_last" site2="drone_cable_hook_right" solref="0.005 1"
+      solimp="0.9 0.95 0.001 0.001 0.001"/>
+      <weld name="cable3_robot_body" site1="cable3_S_last" site2="drone_cable_hook_front" solref="0.005 1"
+      solimp="0.9 0.95 0.001 0.001 0.001"/>
+      <weld name="cable4_robot_body" site1="cable4_S_last" site2="drone_cable_hook_back" solref="0.005 1"
+      solimp="0.9 0.95 0.001 0.001 0.001"/>
   </equality>
   <contact>
     <exclude body1="cable1_B_first" body2="drone" />

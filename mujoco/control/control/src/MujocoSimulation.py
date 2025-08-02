@@ -117,6 +117,8 @@ class MujocoSimulation(threading.Thread):
                     sensorValues[name] = np.copy(
                         self._data.sensordata[index : index + dim]
                     )
+                    if debug:
+                        print("[MujocoSimulation] Data locked at sensor.")
                 index += dim
 
             manipulatorGlobalPosition = [0, 0, 0]
@@ -146,6 +148,8 @@ class MujocoSimulation(threading.Thread):
                             )
                         with self._dataLock:
                             self._data.ctrl[self._actuatorsIDs[name]] = value
+                            if debug:
+                                print("[MujocoSimulation] Data locked at actuator.")
                     else:
                         print(f"[WARNING] Actuator '{name}' not found in model.")
 
@@ -232,6 +236,9 @@ class MujocoSimulation(threading.Thread):
 
     def launchViewer(self):
         """Launch passive viewer on a separate thread."""
+        n = 0
+        periodSum = 0
+        PERIOD = 0.01
         with mujoco.viewer.launch_passive(
             self._model, self._data, show_left_ui=False, show_right_ui=True
         ) as viewer:
@@ -240,14 +247,27 @@ class MujocoSimulation(threading.Thread):
             self.setViewersCamera(droneID)
             while self._viewerRunning.is_set():
                 try:
+                    ts = time.perf_counter()
                     with self._dataLock:
                         self._viewer.sync()
-                    time.sleep(0.001)  # FPS control (1000 Hz)
+                        if self._debugging and n % 200 == 0:
+                            print("[Viewer Thread] Data locked.")
+                    n += 1
+                    tf = time.perf_counter()
+                    periodSum += tf - ts
+                    sleepTime = PERIOD - (tf - ts)
+                    if sleepTime > 0:
+                        time.sleep(sleepTime)  # FPS control (100 Hz)
                 except Exception as e:
                     print(f"[Viewer Thread] Error: {e}")
                     break
 
             self._viewer.close()
+        avgPeriod = periodSum / n
+        avgFrequency = 1 / avgPeriod
+        print(
+            f"[MujocViewerThread] Average Frequency: {avgFrequency}, Number of Syncs: {n}"
+        )
 
     def passive_render_function(self, m, d):
         with self._dataLock:
