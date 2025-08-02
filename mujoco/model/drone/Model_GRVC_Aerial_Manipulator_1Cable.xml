@@ -7,7 +7,6 @@
   
   <!--Compiler options: integration method and time step -->
   <option integrator="Euler" timestep="0.001" density="1.204" viscosity="1.8e-5" gravity="0 0 -9.8" />
-  <!-- <size nconmax="100" /> -->
   <include file="../assets.xml"/>
   <extension>
     <plugin plugin="mujoco.elasticity.cable" />
