@@ -89,8 +89,9 @@ class MujocoSimulation(threading.Thread):
         if len(actuadoresConIDMenosUno) > 0:
             print(f"[ERROR] Actuadores con ID -1: {actuadoresConIDMenosUno}")
 
-        """ manipulatorID = mujoco.mj_name2id(self._model, mujoco.mjtObj.mjOBJ_BODY, 'manipulator')
-        manipulatorGlobalPosition = self._data.xpos[manipulatorID] """
+        manipulatorID = mujoco.mj_name2id(
+            self._model, mujoco.mjtObj.mjOBJ_BODY, "LiCAS_A1"
+        )
         iteration = 0
         timestep = self._model.opt.timestep
         nextTime = time.perf_counter()
@@ -105,7 +106,13 @@ class MujocoSimulation(threading.Thread):
             iteration += 1
             with self._dataLock:
                 droneGlobalPosition = np.copy(self._data.xpos[droneID])
+                manipulatorGlobalPosition = self._data.xpos[manipulatorID]
                 currentTimestamp = self._data.time
+
+            if iteration == 1:
+                print(
+                    f"[MujocoSimulation] Initial Manipulator position: {manipulatorGlobalPosition}, Initial Drone position: {droneGlobalPosition}"
+                )
             # iteration = self.testDroneControl(droneID, iteration)
 
             # Get sensor data and send to DroneControl thread
