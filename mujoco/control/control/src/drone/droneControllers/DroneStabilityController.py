@@ -187,7 +187,7 @@ class DroneStabilityController(threading.Thread):
         """Get the rotor adjustments to be applied to the drone."""
         with self._stabilityActionLock:
             rotorAdjustments = self._rotorAdjustments.copy()
-        return rotorAdjustments
+        return rotorAdjustments.copy()
 
     def stop(self):
         self._shutdownEvent.set()

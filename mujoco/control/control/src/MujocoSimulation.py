@@ -7,10 +7,10 @@ import mujoco
 import mujoco.viewer
 import threading
 import numpy as np
-import queue
 from include.Messages import SensorData, ControlAction
 import time
 from src.drone.DroneControl import DroneControl
+from cy_sim_utils import extract_sensor_values, apply_control_inputs
 
 
 class MujocoSimulation(threading.Thread):
@@ -63,9 +63,15 @@ class MujocoSimulation(threading.Thread):
             self._model.actuator(i).name: i for i in range(self._model.nu)
         }
 
+        self._sensorInfo = []
+        for i in range(self._model.nsensor):
+            name = self._model.sensor(i).name
+            dim = int(self._model.sensor(i).dim)
+            self._sensorInfo.append((name, dim))
+
         self._dataLock = threading.Lock()
 
-        self._timeDebugging = False
+        self._timeDebugging = True
         self._debugging = False
 
     def run(self):
@@ -85,13 +91,16 @@ class MujocoSimulation(threading.Thread):
         if droneID == -1:
             raise RuntimeError("Body 'drone' not found in model.")
 
+        manipulatorID = mujoco.mj_name2id(
+            self._model, mujoco.mjtObj.mjOBJ_BODY, "LiCAS_A1"
+        )
+        if manipulatorID == -1:
+            raise RuntimeError("Body 'LiCAS_A1' not found in model.")
+
         actuadoresConIDMenosUno = [k for k, v in self._actuatorsIDs.items() if v == -1]
         if len(actuadoresConIDMenosUno) > 0:
             print(f"[ERROR] Actuadores con ID -1: {actuadoresConIDMenosUno}")
 
-        manipulatorID = mujoco.mj_name2id(
-            self._model, mujoco.mjtObj.mjOBJ_BODY, "LiCAS_A1"
-        )
         iteration = 0
         timestep = self._model.opt.timestep
         nextTime = time.perf_counter()
@@ -104,29 +113,26 @@ class MujocoSimulation(threading.Thread):
             if timeDebug:
                 t0 = time.time()
             iteration += 1
+
+            # iteration = self.testDroneControl(droneID, iteration)
+
+            ###########################################################
+            # --- Get sensor data and send to DroneControl thread ---
+            ###########################################################
             with self._dataLock:
                 droneGlobalPosition = np.copy(self._data.xpos[droneID])
-                manipulatorGlobalPosition = self._data.xpos[manipulatorID]
+                manipulatorGlobalPosition = np.copy(self._data.xpos[manipulatorID])
                 currentTimestamp = self._data.time
+                sensorData = np.copy(self._data.sensordata)
+                if debug:
+                    print("[MujocoSimulation] Data locked at sensor.")
 
             if iteration == 1:
                 print(
                     f"[MujocoSimulation] Initial Manipulator position: {manipulatorGlobalPosition}, Initial Drone position: {droneGlobalPosition}"
                 )
-            # iteration = self.testDroneControl(droneID, iteration)
 
-            # Get sensor data and send to DroneControl thread
-            index = 0
-            for i in range(self._model.nsensor):
-                name = self._model.sensor(i).name
-                dim = int(self._model.sensor(i).dim)
-                with self._dataLock:
-                    sensorValues[name] = np.copy(
-                        self._data.sensordata[index : index + dim]
-                    )
-                    if debug:
-                        print("[MujocoSimulation] Data locked at sensor.")
-                index += dim
+            sensorValues = extract_sensor_values(sensorData, self._sensorInfo)
 
             manipulatorGlobalPosition = [0, 0, 0]
             sensorDataMessage = SensorData(
@@ -141,27 +147,19 @@ class MujocoSimulation(threading.Thread):
             if debug:
                 print(f"[MujocoSimulation] sensorDataMessage: {sensorDataMessage}")
 
-            # Get control output from DroneControl thread
+            ###########################################################
+            # --- Get control output from DroneControl thread ---
+            ###########################################################
             if timeDebug:
                 t1 = time.time()
-            try:
-                controlAction: ControlAction = self._droneController.getControlInputs()
-                allControlActions = {**controlAction.droneThrusters}
-                for name, value in allControlActions.items():
-                    if name in self._actuatorsIDs:
-                        if debug:
-                            print(
-                                f"[MujocoSimulation] Actuator: {name}, value: {value}"
-                            )
-                        with self._dataLock:
-                            self._data.ctrl[self._actuatorsIDs[name]] = value
-                            if debug:
-                                print("[MujocoSimulation] Data locked at actuator.")
-                    else:
-                        print(f"[WARNING] Actuator '{name}' not found in model.")
 
-            except queue.Empty:
-                pass
+            controlAction: ControlAction = self._droneController.getControlInputs()
+            allControlActions = {**controlAction.droneThrusters}
+
+            with self._dataLock:
+                apply_control_inputs(
+                    self._data.ctrl, self._actuatorsIDs, allControlActions
+                )
 
             if timeDebug:
                 t2 = time.time()
@@ -212,7 +210,7 @@ class MujocoSimulation(threading.Thread):
                 totalCycle = time.perf_counter() - tStart
                 print(f"[MujocoSimulation] Total Cycle: {totalCycle}.")
 
-        # print("[MujocoSimulation] Ending simulation.")
+        print("[MujocoSimulation] Ending simulation.")
         self._viewerRunning.clear()
         self._viewerThread.join()
 
@@ -275,14 +273,6 @@ class MujocoSimulation(threading.Thread):
         print(
             f"[MujocViewerThread] Average Frequency: {avgFrequency}, Number of Syncs: {n}"
         )
-
-    def passive_render_function(self, m, d):
-        with self._dataLock:
-            # Copiamos solo lo que se necesita para el viewer
-            qpos = np.copy(self._data.qpos)
-            ctrl = np.copy(self._data.ctrl)
-            # Se podría hacer más copia si quieres mostrar más info
-        return f"qpos[0]: {qpos[0]:.3f} | ctrl[0]: {ctrl[0]:.3f}"
 
 
 if __name__ == "__main__":

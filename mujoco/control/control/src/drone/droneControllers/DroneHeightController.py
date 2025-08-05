@@ -224,7 +224,7 @@ class DroneHeightController(threading.Thread):
 
     def getRotorForce(self):
         with self._heightResultsLock:
-            return self._rotorForce
+            return np.copy(self._rotorForce)
 
     def getReachedReference(self):
         with self._heightResultsLock:
