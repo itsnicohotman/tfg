@@ -2570,6 +2570,10 @@ static PyObject* __Pyx_ImportFrom(PyObject* module, PyObject* name);
 /* HasAttr.proto */
 static CYTHON_INLINE int __Pyx_HasAttr(PyObject *, PyObject *);
 
+/* unicode_tailmatch.proto */
+static int __Pyx_PyUnicode_Tailmatch(
+    PyObject* s, PyObject* substr, Py_ssize_t start, Py_ssize_t end, int direction);
+
 /* IterFinish.proto */
 static CYTHON_INLINE int __Pyx_IterFinish(void);
 
@@ -3268,6 +3272,7 @@ static const char __pyx_k_new[] = "__new__";
 static const char __pyx_k_obj[] = "obj";
 static const char __pyx_k_sys[] = "sys";
 static const char __pyx_k_base[] = "base";
+static const char __pyx_k_body[] = "body_";
 static const char __pyx_k_ctrl[] = "ctrl";
 static const char __pyx_k_dict[] = "__dict__";
 static const char __pyx_k_info[] = "info";
@@ -3290,6 +3295,7 @@ static const char __pyx_k_index[] = "index";
 static const char __pyx_k_items[] = "items";
 static const char __pyx_k_numpy[] = "numpy";
 static const char __pyx_k_range[] = "range";
+static const char __pyx_k_robot[] = "robot_";
 static const char __pyx_k_shape[] = "shape";
 static const char __pyx_k_start[] = "start";
 static const char __pyx_k_value[] = "value";
@@ -3303,7 +3309,6 @@ static const char __pyx_k_reduce[] = "__reduce__";
 static const char __pyx_k_struct[] = "struct";
 static const char __pyx_k_unpack[] = "unpack";
 static const char __pyx_k_update[] = "update";
-static const char __pyx_k_values[] = "values";
 static const char __pyx_k_asarray[] = "asarray";
 static const char __pyx_k_disable[] = "disable";
 static const char __pyx_k_fortran[] = "fortran";
@@ -3329,12 +3334,14 @@ static const char __pyx_k_sensorInfo[] = "sensorInfo";
 static const char __pyx_k_ImportError[] = "ImportError";
 static const char __pyx_k_MemoryError[] = "MemoryError";
 static const char __pyx_k_PickleError[] = "PickleError";
+static const char __pyx_k_body_values[] = "body_values";
 static const char __pyx_k_collections[] = "collections";
 static const char __pyx_k_actuatorsIDs[] = "actuatorsIDs";
 static const char __pyx_k_cy_sim_utils[] = "cy_sim_utils";
 static const char __pyx_k_initializing[] = "_initializing";
 static const char __pyx_k_is_coroutine[] = "_is_coroutine";
 static const char __pyx_k_pyx_checksum[] = "__pyx_checksum";
+static const char __pyx_k_robot_values[] = "robot_values";
 static const char __pyx_k_stringsource[] = "<stringsource>";
 static const char __pyx_k_version_info[] = "version_info";
 static const char __pyx_k_class_getitem[] = "__class_getitem__";
@@ -3549,6 +3556,8 @@ typedef struct {
   PyObject *__pyx_n_s_asarray;
   PyObject *__pyx_n_s_asyncio_coroutines;
   PyObject *__pyx_n_s_base;
+  PyObject *__pyx_n_u_body;
+  PyObject *__pyx_n_s_body_values;
   PyObject *__pyx_n_s_c;
   PyObject *__pyx_n_u_c;
   PyObject *__pyx_n_s_class;
@@ -3620,6 +3629,8 @@ typedef struct {
   PyObject *__pyx_n_s_reduce_cython;
   PyObject *__pyx_n_s_reduce_ex;
   PyObject *__pyx_n_s_register;
+  PyObject *__pyx_n_u_robot;
+  PyObject *__pyx_n_s_robot_values;
   PyObject *__pyx_n_s_sensorData;
   PyObject *__pyx_n_s_sensorInfo;
   PyObject *__pyx_n_s_setstate;
@@ -3642,7 +3653,6 @@ typedef struct {
   PyObject *__pyx_n_s_unpack;
   PyObject *__pyx_n_s_update;
   PyObject *__pyx_n_s_value;
-  PyObject *__pyx_n_s_values;
   PyObject *__pyx_n_s_version_info;
   PyObject *__pyx_int_0;
   PyObject *__pyx_int_1;
@@ -3782,6 +3792,8 @@ static int __pyx_m_clear(PyObject *m) {
   Py_CLEAR(clear_module_state->__pyx_n_s_asarray);
   Py_CLEAR(clear_module_state->__pyx_n_s_asyncio_coroutines);
   Py_CLEAR(clear_module_state->__pyx_n_s_base);
+  Py_CLEAR(clear_module_state->__pyx_n_u_body);
+  Py_CLEAR(clear_module_state->__pyx_n_s_body_values);
   Py_CLEAR(clear_module_state->__pyx_n_s_c);
   Py_CLEAR(clear_module_state->__pyx_n_u_c);
   Py_CLEAR(clear_module_state->__pyx_n_s_class);
@@ -3853,6 +3865,8 @@ static int __pyx_m_clear(PyObject *m) {
   Py_CLEAR(clear_module_state->__pyx_n_s_reduce_cython);
   Py_CLEAR(clear_module_state->__pyx_n_s_reduce_ex);
   Py_CLEAR(clear_module_state->__pyx_n_s_register);
+  Py_CLEAR(clear_module_state->__pyx_n_u_robot);
+  Py_CLEAR(clear_module_state->__pyx_n_s_robot_values);
   Py_CLEAR(clear_module_state->__pyx_n_s_sensorData);
   Py_CLEAR(clear_module_state->__pyx_n_s_sensorInfo);
   Py_CLEAR(clear_module_state->__pyx_n_s_setstate);
@@ -3875,7 +3889,6 @@ static int __pyx_m_clear(PyObject *m) {
   Py_CLEAR(clear_module_state->__pyx_n_s_unpack);
   Py_CLEAR(clear_module_state->__pyx_n_s_update);
   Py_CLEAR(clear_module_state->__pyx_n_s_value);
-  Py_CLEAR(clear_module_state->__pyx_n_s_values);
   Py_CLEAR(clear_module_state->__pyx_n_s_version_info);
   Py_CLEAR(clear_module_state->__pyx_int_0);
   Py_CLEAR(clear_module_state->__pyx_int_1);
@@ -3993,6 +4006,8 @@ static int __pyx_m_traverse(PyObject *m, visitproc visit, void *arg) {
   Py_VISIT(traverse_module_state->__pyx_n_s_asarray);
   Py_VISIT(traverse_module_state->__pyx_n_s_asyncio_coroutines);
   Py_VISIT(traverse_module_state->__pyx_n_s_base);
+  Py_VISIT(traverse_module_state->__pyx_n_u_body);
+  Py_VISIT(traverse_module_state->__pyx_n_s_body_values);
   Py_VISIT(traverse_module_state->__pyx_n_s_c);
   Py_VISIT(traverse_module_state->__pyx_n_u_c);
   Py_VISIT(traverse_module_state->__pyx_n_s_class);
@@ -4064,6 +4079,8 @@ static int __pyx_m_traverse(PyObject *m, visitproc visit, void *arg) {
   Py_VISIT(traverse_module_state->__pyx_n_s_reduce_cython);
   Py_VISIT(traverse_module_state->__pyx_n_s_reduce_ex);
   Py_VISIT(traverse_module_state->__pyx_n_s_register);
+  Py_VISIT(traverse_module_state->__pyx_n_u_robot);
+  Py_VISIT(traverse_module_state->__pyx_n_s_robot_values);
   Py_VISIT(traverse_module_state->__pyx_n_s_sensorData);
   Py_VISIT(traverse_module_state->__pyx_n_s_sensorInfo);
   Py_VISIT(traverse_module_state->__pyx_n_s_setstate);
@@ -4086,7 +4103,6 @@ static int __pyx_m_traverse(PyObject *m, visitproc visit, void *arg) {
   Py_VISIT(traverse_module_state->__pyx_n_s_unpack);
   Py_VISIT(traverse_module_state->__pyx_n_s_update);
   Py_VISIT(traverse_module_state->__pyx_n_s_value);
-  Py_VISIT(traverse_module_state->__pyx_n_s_values);
   Py_VISIT(traverse_module_state->__pyx_n_s_version_info);
   Py_VISIT(traverse_module_state->__pyx_int_0);
   Py_VISIT(traverse_module_state->__pyx_int_1);
@@ -4232,6 +4248,8 @@ static int __pyx_m_traverse(PyObject *m, visitproc visit, void *arg) {
 #define __pyx_n_s_asarray __pyx_mstate_global->__pyx_n_s_asarray
 #define __pyx_n_s_asyncio_coroutines __pyx_mstate_global->__pyx_n_s_asyncio_coroutines
 #define __pyx_n_s_base __pyx_mstate_global->__pyx_n_s_base
+#define __pyx_n_u_body __pyx_mstate_global->__pyx_n_u_body
+#define __pyx_n_s_body_values __pyx_mstate_global->__pyx_n_s_body_values
 #define __pyx_n_s_c __pyx_mstate_global->__pyx_n_s_c
 #define __pyx_n_u_c __pyx_mstate_global->__pyx_n_u_c
 #define __pyx_n_s_class __pyx_mstate_global->__pyx_n_s_class
@@ -4303,6 +4321,8 @@ static int __pyx_m_traverse(PyObject *m, visitproc visit, void *arg) {
 #define __pyx_n_s_reduce_cython __pyx_mstate_global->__pyx_n_s_reduce_cython
 #define __pyx_n_s_reduce_ex __pyx_mstate_global->__pyx_n_s_reduce_ex
 #define __pyx_n_s_register __pyx_mstate_global->__pyx_n_s_register
+#define __pyx_n_u_robot __pyx_mstate_global->__pyx_n_u_robot
+#define __pyx_n_s_robot_values __pyx_mstate_global->__pyx_n_s_robot_values
 #define __pyx_n_s_sensorData __pyx_mstate_global->__pyx_n_s_sensorData
 #define __pyx_n_s_sensorInfo __pyx_mstate_global->__pyx_n_s_sensorInfo
 #define __pyx_n_s_setstate __pyx_mstate_global->__pyx_n_s_setstate
@@ -4325,7 +4345,6 @@ static int __pyx_m_traverse(PyObject *m, visitproc visit, void *arg) {
 #define __pyx_n_s_unpack __pyx_mstate_global->__pyx_n_s_unpack
 #define __pyx_n_s_update __pyx_mstate_global->__pyx_n_s_update
 #define __pyx_n_s_value __pyx_mstate_global->__pyx_n_s_value
-#define __pyx_n_s_values __pyx_mstate_global->__pyx_n_s_values
 #define __pyx_n_s_version_info __pyx_mstate_global->__pyx_n_s_version_info
 #define __pyx_int_0 __pyx_mstate_global->__pyx_int_0
 #define __pyx_int_1 __pyx_mstate_global->__pyx_int_1
@@ -19676,10 +19695,10 @@ static CYTHON_INLINE NPY_DATETIMEUNIT __pyx_f_5numpy_get_datetime64_unit(PyObjec
 
 /* "cy_sim_utils.pyx":9
  * 
- * # --- 1. Preprocesar sensores ---
+ * # --- Preprocesses drone sensors and robot sensors separately ---
  * def extract_sensor_values(double[:] sensorData, list sensorInfo):             # <<<<<<<<<<<<<<
- *     cdef dict values = {}
- *     cdef Py_ssize_t i = 0, dim
+ *     cdef dict body_values = {}
+ *     cdef dict robot_values = {}
  */
 
 /* Python wrapper */
@@ -19801,7 +19820,8 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
 }
 
 static PyObject *__pyx_pf_12cy_sim_utils_extract_sensor_values(CYTHON_UNUSED PyObject *__pyx_self, __Pyx_memviewslice __pyx_v_sensorData, PyObject *__pyx_v_sensorInfo) {
-  PyObject *__pyx_v_values = 0;
+  PyObject *__pyx_v_body_values = 0;
+  PyObject *__pyx_v_robot_values = 0;
   Py_ssize_t __pyx_v_i;
   Py_ssize_t __pyx_v_dim;
   PyObject *__pyx_v_name = 0;
@@ -19812,39 +19832,52 @@ static PyObject *__pyx_pf_12cy_sim_utils_extract_sensor_values(CYTHON_UNUSED PyO
   Py_ssize_t __pyx_t_2;
   PyObject *__pyx_t_3 = NULL;
   Py_ssize_t __pyx_t_4;
-  PyObject *__pyx_t_5 = NULL;
+  int __pyx_t_5;
   PyObject *__pyx_t_6 = NULL;
-  __Pyx_memviewslice __pyx_t_7 = { 0, 0, { 0 }, { 0 }, { 0 } };
-  int __pyx_t_8;
-  PyObject *__pyx_t_9 = NULL;
-  unsigned int __pyx_t_10;
+  PyObject *__pyx_t_7 = NULL;
+  __Pyx_memviewslice __pyx_t_8 = { 0, 0, { 0 }, { 0 }, { 0 } };
+  int __pyx_t_9;
+  PyObject *__pyx_t_10 = NULL;
+  unsigned int __pyx_t_11;
   int __pyx_lineno = 0;
   const char *__pyx_filename = NULL;
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("extract_sensor_values", 1);
 
   /* "cy_sim_utils.pyx":10
- * # --- 1. Preprocesar sensores ---
+ * # --- Preprocesses drone sensors and robot sensors separately ---
  * def extract_sensor_values(double[:] sensorData, list sensorInfo):
- *     cdef dict values = {}             # <<<<<<<<<<<<<<
+ *     cdef dict body_values = {}             # <<<<<<<<<<<<<<
+ *     cdef dict robot_values = {}
  *     cdef Py_ssize_t i = 0, dim
- *     cdef str name
  */
   __pyx_t_1 = __Pyx_PyDict_NewPresized(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 10, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_1);
-  __pyx_v_values = ((PyObject*)__pyx_t_1);
+  __pyx_v_body_values = ((PyObject*)__pyx_t_1);
   __pyx_t_1 = 0;
 
   /* "cy_sim_utils.pyx":11
  * def extract_sensor_values(double[:] sensorData, list sensorInfo):
- *     cdef dict values = {}
+ *     cdef dict body_values = {}
+ *     cdef dict robot_values = {}             # <<<<<<<<<<<<<<
+ *     cdef Py_ssize_t i = 0, dim
+ *     cdef str name
+ */
+  __pyx_t_1 = __Pyx_PyDict_NewPresized(0); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 11, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __pyx_v_robot_values = ((PyObject*)__pyx_t_1);
+  __pyx_t_1 = 0;
+
+  /* "cy_sim_utils.pyx":12
+ *     cdef dict body_values = {}
+ *     cdef dict robot_values = {}
  *     cdef Py_ssize_t i = 0, dim             # <<<<<<<<<<<<<<
  *     cdef str name
  *     for info in sensorInfo:
  */
   __pyx_v_i = 0;
 
-  /* "cy_sim_utils.pyx":13
+  /* "cy_sim_utils.pyx":14
  *     cdef Py_ssize_t i = 0, dim
  *     cdef str name
  *     for info in sensorInfo:             # <<<<<<<<<<<<<<
@@ -19853,7 +19886,7 @@ static PyObject *__pyx_pf_12cy_sim_utils_extract_sensor_values(CYTHON_UNUSED PyO
  */
   if (unlikely(__pyx_v_sensorInfo == Py_None)) {
     PyErr_SetString(PyExc_TypeError, "'NoneType' object is not iterable");
-    __PYX_ERR(1, 13, __pyx_L1_error)
+    __PYX_ERR(1, 14, __pyx_L1_error)
   }
   __pyx_t_1 = __pyx_v_sensorInfo; __Pyx_INCREF(__pyx_t_1);
   __pyx_t_2 = 0;
@@ -19861,67 +19894,81 @@ static PyObject *__pyx_pf_12cy_sim_utils_extract_sensor_values(CYTHON_UNUSED PyO
     {
       Py_ssize_t __pyx_temp = __Pyx_PyList_GET_SIZE(__pyx_t_1);
       #if !CYTHON_ASSUME_SAFE_MACROS
-      if (unlikely((__pyx_temp < 0))) __PYX_ERR(1, 13, __pyx_L1_error)
+      if (unlikely((__pyx_temp < 0))) __PYX_ERR(1, 14, __pyx_L1_error)
       #endif
       if (__pyx_t_2 >= __pyx_temp) break;
     }
     #if CYTHON_ASSUME_SAFE_MACROS && !CYTHON_AVOID_BORROWED_REFS
-    __pyx_t_3 = PyList_GET_ITEM(__pyx_t_1, __pyx_t_2); __Pyx_INCREF(__pyx_t_3); __pyx_t_2++; if (unlikely((0 < 0))) __PYX_ERR(1, 13, __pyx_L1_error)
+    __pyx_t_3 = PyList_GET_ITEM(__pyx_t_1, __pyx_t_2); __Pyx_INCREF(__pyx_t_3); __pyx_t_2++; if (unlikely((0 < 0))) __PYX_ERR(1, 14, __pyx_L1_error)
     #else
-    __pyx_t_3 = __Pyx_PySequence_ITEM(__pyx_t_1, __pyx_t_2); __pyx_t_2++; if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 13, __pyx_L1_error)
+    __pyx_t_3 = __Pyx_PySequence_ITEM(__pyx_t_1, __pyx_t_2); __pyx_t_2++; if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 14, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_3);
     #endif
     __Pyx_XDECREF_SET(__pyx_v_info, __pyx_t_3);
     __pyx_t_3 = 0;
 
-    /* "cy_sim_utils.pyx":14
+    /* "cy_sim_utils.pyx":15
  *     cdef str name
  *     for info in sensorInfo:
  *         name = info[0]             # <<<<<<<<<<<<<<
  *         dim = info[1]
- *         values[name] = np.asarray(sensorData[i:i+dim])
+ *         if name.startswith("body_"):
  */
-    __pyx_t_3 = __Pyx_GetItemInt(__pyx_v_info, 0, long, 1, __Pyx_PyInt_From_long, 0, 0, 0); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 14, __pyx_L1_error)
+    __pyx_t_3 = __Pyx_GetItemInt(__pyx_v_info, 0, long, 1, __Pyx_PyInt_From_long, 0, 0, 0); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 15, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_3);
-    if (!(likely(PyUnicode_CheckExact(__pyx_t_3))||((__pyx_t_3) == Py_None) || __Pyx_RaiseUnexpectedTypeError("unicode", __pyx_t_3))) __PYX_ERR(1, 14, __pyx_L1_error)
+    if (!(likely(PyUnicode_CheckExact(__pyx_t_3))||((__pyx_t_3) == Py_None) || __Pyx_RaiseUnexpectedTypeError("unicode", __pyx_t_3))) __PYX_ERR(1, 15, __pyx_L1_error)
     __Pyx_XDECREF_SET(__pyx_v_name, ((PyObject*)__pyx_t_3));
     __pyx_t_3 = 0;
 
-    /* "cy_sim_utils.pyx":15
+    /* "cy_sim_utils.pyx":16
  *     for info in sensorInfo:
  *         name = info[0]
  *         dim = info[1]             # <<<<<<<<<<<<<<
- *         values[name] = np.asarray(sensorData[i:i+dim])
- *         i += dim
+ *         if name.startswith("body_"):
+ *             body_values[name] = np.asarray(sensorData[i:i+dim])
  */
-    __pyx_t_3 = __Pyx_GetItemInt(__pyx_v_info, 1, long, 1, __Pyx_PyInt_From_long, 0, 0, 0); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 15, __pyx_L1_error)
+    __pyx_t_3 = __Pyx_GetItemInt(__pyx_v_info, 1, long, 1, __Pyx_PyInt_From_long, 0, 0, 0); if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 16, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_3);
-    __pyx_t_4 = __Pyx_PyIndex_AsSsize_t(__pyx_t_3); if (unlikely((__pyx_t_4 == (Py_ssize_t)-1) && PyErr_Occurred())) __PYX_ERR(1, 15, __pyx_L1_error)
+    __pyx_t_4 = __Pyx_PyIndex_AsSsize_t(__pyx_t_3); if (unlikely((__pyx_t_4 == (Py_ssize_t)-1) && PyErr_Occurred())) __PYX_ERR(1, 16, __pyx_L1_error)
     __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
     __pyx_v_dim = __pyx_t_4;
 
-    /* "cy_sim_utils.pyx":16
+    /* "cy_sim_utils.pyx":17
  *         name = info[0]
  *         dim = info[1]
- *         values[name] = np.asarray(sensorData[i:i+dim])             # <<<<<<<<<<<<<<
- *         i += dim
- *     return values
+ *         if name.startswith("body_"):             # <<<<<<<<<<<<<<
+ *             body_values[name] = np.asarray(sensorData[i:i+dim])
+ *         elif name.startswith("robot_"):
  */
-    __Pyx_GetModuleGlobalName(__pyx_t_5, __pyx_n_s_np); if (unlikely(!__pyx_t_5)) __PYX_ERR(1, 16, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_5);
-    __pyx_t_6 = __Pyx_PyObject_GetAttrStr(__pyx_t_5, __pyx_n_s_asarray); if (unlikely(!__pyx_t_6)) __PYX_ERR(1, 16, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_6);
-    __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-    __pyx_t_7.data = __pyx_v_sensorData.data;
-    __pyx_t_7.memview = __pyx_v_sensorData.memview;
-    __PYX_INC_MEMVIEW(&__pyx_t_7, 1);
-    __pyx_t_8 = -1;
-    if (unlikely(__pyx_memoryview_slice_memviewslice(
-    &__pyx_t_7,
+    if (unlikely(__pyx_v_name == Py_None)) {
+      PyErr_Format(PyExc_AttributeError, "'NoneType' object has no attribute '%.30s'", "startswith");
+      __PYX_ERR(1, 17, __pyx_L1_error)
+    }
+    __pyx_t_5 = __Pyx_PyUnicode_Tailmatch(__pyx_v_name, __pyx_n_u_body, 0, PY_SSIZE_T_MAX, -1); if (unlikely(__pyx_t_5 == ((int)-1))) __PYX_ERR(1, 17, __pyx_L1_error)
+    if (__pyx_t_5) {
+
+      /* "cy_sim_utils.pyx":18
+ *         dim = info[1]
+ *         if name.startswith("body_"):
+ *             body_values[name] = np.asarray(sensorData[i:i+dim])             # <<<<<<<<<<<<<<
+ *         elif name.startswith("robot_"):
+ *             robot_values[name] = np.asarray(sensorData[i:i+dim])
+ */
+      __Pyx_GetModuleGlobalName(__pyx_t_6, __pyx_n_s_np); if (unlikely(!__pyx_t_6)) __PYX_ERR(1, 18, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_6);
+      __pyx_t_7 = __Pyx_PyObject_GetAttrStr(__pyx_t_6, __pyx_n_s_asarray); if (unlikely(!__pyx_t_7)) __PYX_ERR(1, 18, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_7);
+      __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
+      __pyx_t_8.data = __pyx_v_sensorData.data;
+      __pyx_t_8.memview = __pyx_v_sensorData.memview;
+      __PYX_INC_MEMVIEW(&__pyx_t_8, 1);
+      __pyx_t_9 = -1;
+      if (unlikely(__pyx_memoryview_slice_memviewslice(
+    &__pyx_t_8,
     __pyx_v_sensorData.shape[0], __pyx_v_sensorData.strides[0], __pyx_v_sensorData.suboffsets[0],
     0,
     0,
-    &__pyx_t_8,
+    &__pyx_t_9,
     __pyx_v_i,
     (__pyx_v_i + __pyx_v_dim),
     0,
@@ -19930,49 +19977,146 @@ static PyObject *__pyx_pf_12cy_sim_utils_extract_sensor_values(CYTHON_UNUSED PyO
     0,
     1) < 0))
 {
-    __PYX_ERR(1, 16, __pyx_L1_error)
+    __PYX_ERR(1, 18, __pyx_L1_error)
 }
 
-__pyx_t_5 = __pyx_memoryview_fromslice(__pyx_t_7, 1, (PyObject *(*)(char *)) __pyx_memview_get_double, (int (*)(char *, PyObject *)) __pyx_memview_set_double, 0);; if (unlikely(!__pyx_t_5)) __PYX_ERR(1, 16, __pyx_L1_error)
-    __Pyx_GOTREF(__pyx_t_5);
-    __PYX_XCLEAR_MEMVIEW(&__pyx_t_7, 1);
-    __pyx_t_7.memview = NULL; __pyx_t_7.data = NULL;
-    __pyx_t_9 = NULL;
-    __pyx_t_10 = 0;
-    #if CYTHON_UNPACK_METHODS
-    if (unlikely(PyMethod_Check(__pyx_t_6))) {
-      __pyx_t_9 = PyMethod_GET_SELF(__pyx_t_6);
-      if (likely(__pyx_t_9)) {
-        PyObject* function = PyMethod_GET_FUNCTION(__pyx_t_6);
-        __Pyx_INCREF(__pyx_t_9);
-        __Pyx_INCREF(function);
-        __Pyx_DECREF_SET(__pyx_t_6, function);
-        __pyx_t_10 = 1;
+__pyx_t_6 = __pyx_memoryview_fromslice(__pyx_t_8, 1, (PyObject *(*)(char *)) __pyx_memview_get_double, (int (*)(char *, PyObject *)) __pyx_memview_set_double, 0);; if (unlikely(!__pyx_t_6)) __PYX_ERR(1, 18, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_6);
+      __PYX_XCLEAR_MEMVIEW(&__pyx_t_8, 1);
+      __pyx_t_8.memview = NULL; __pyx_t_8.data = NULL;
+      __pyx_t_10 = NULL;
+      __pyx_t_11 = 0;
+      #if CYTHON_UNPACK_METHODS
+      if (unlikely(PyMethod_Check(__pyx_t_7))) {
+        __pyx_t_10 = PyMethod_GET_SELF(__pyx_t_7);
+        if (likely(__pyx_t_10)) {
+          PyObject* function = PyMethod_GET_FUNCTION(__pyx_t_7);
+          __Pyx_INCREF(__pyx_t_10);
+          __Pyx_INCREF(function);
+          __Pyx_DECREF_SET(__pyx_t_7, function);
+          __pyx_t_11 = 1;
+        }
       }
-    }
-    #endif
-    {
-      PyObject *__pyx_callargs[2] = {__pyx_t_9, __pyx_t_5};
-      __pyx_t_3 = __Pyx_PyObject_FastCall(__pyx_t_6, __pyx_callargs+1-__pyx_t_10, 1+__pyx_t_10);
-      __Pyx_XDECREF(__pyx_t_9); __pyx_t_9 = 0;
-      __Pyx_DECREF(__pyx_t_5); __pyx_t_5 = 0;
-      if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 16, __pyx_L1_error)
-      __Pyx_GOTREF(__pyx_t_3);
-      __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
-    }
-    if (unlikely((PyDict_SetItem(__pyx_v_values, __pyx_v_name, __pyx_t_3) < 0))) __PYX_ERR(1, 16, __pyx_L1_error)
-    __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+      #endif
+      {
+        PyObject *__pyx_callargs[2] = {__pyx_t_10, __pyx_t_6};
+        __pyx_t_3 = __Pyx_PyObject_FastCall(__pyx_t_7, __pyx_callargs+1-__pyx_t_11, 1+__pyx_t_11);
+        __Pyx_XDECREF(__pyx_t_10); __pyx_t_10 = 0;
+        __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
+        if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 18, __pyx_L1_error)
+        __Pyx_GOTREF(__pyx_t_3);
+        __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
+      }
+      if (unlikely((PyDict_SetItem(__pyx_v_body_values, __pyx_v_name, __pyx_t_3) < 0))) __PYX_ERR(1, 18, __pyx_L1_error)
+      __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
 
-    /* "cy_sim_utils.pyx":17
+      /* "cy_sim_utils.pyx":17
+ *         name = info[0]
  *         dim = info[1]
- *         values[name] = np.asarray(sensorData[i:i+dim])
+ *         if name.startswith("body_"):             # <<<<<<<<<<<<<<
+ *             body_values[name] = np.asarray(sensorData[i:i+dim])
+ *         elif name.startswith("robot_"):
+ */
+      goto __pyx_L5;
+    }
+
+    /* "cy_sim_utils.pyx":19
+ *         if name.startswith("body_"):
+ *             body_values[name] = np.asarray(sensorData[i:i+dim])
+ *         elif name.startswith("robot_"):             # <<<<<<<<<<<<<<
+ *             robot_values[name] = np.asarray(sensorData[i:i+dim])
+ *         i += dim
+ */
+    if (unlikely(__pyx_v_name == Py_None)) {
+      PyErr_Format(PyExc_AttributeError, "'NoneType' object has no attribute '%.30s'", "startswith");
+      __PYX_ERR(1, 19, __pyx_L1_error)
+    }
+    __pyx_t_5 = __Pyx_PyUnicode_Tailmatch(__pyx_v_name, __pyx_n_u_robot, 0, PY_SSIZE_T_MAX, -1); if (unlikely(__pyx_t_5 == ((int)-1))) __PYX_ERR(1, 19, __pyx_L1_error)
+    if (__pyx_t_5) {
+
+      /* "cy_sim_utils.pyx":20
+ *             body_values[name] = np.asarray(sensorData[i:i+dim])
+ *         elif name.startswith("robot_"):
+ *             robot_values[name] = np.asarray(sensorData[i:i+dim])             # <<<<<<<<<<<<<<
+ *         i += dim
+ *     return body_values, robot_values
+ */
+      __Pyx_GetModuleGlobalName(__pyx_t_7, __pyx_n_s_np); if (unlikely(!__pyx_t_7)) __PYX_ERR(1, 20, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_7);
+      __pyx_t_6 = __Pyx_PyObject_GetAttrStr(__pyx_t_7, __pyx_n_s_asarray); if (unlikely(!__pyx_t_6)) __PYX_ERR(1, 20, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_6);
+      __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
+      __pyx_t_8.data = __pyx_v_sensorData.data;
+      __pyx_t_8.memview = __pyx_v_sensorData.memview;
+      __PYX_INC_MEMVIEW(&__pyx_t_8, 1);
+      __pyx_t_9 = -1;
+      if (unlikely(__pyx_memoryview_slice_memviewslice(
+    &__pyx_t_8,
+    __pyx_v_sensorData.shape[0], __pyx_v_sensorData.strides[0], __pyx_v_sensorData.suboffsets[0],
+    0,
+    0,
+    &__pyx_t_9,
+    __pyx_v_i,
+    (__pyx_v_i + __pyx_v_dim),
+    0,
+    1,
+    1,
+    0,
+    1) < 0))
+{
+    __PYX_ERR(1, 20, __pyx_L1_error)
+}
+
+__pyx_t_7 = __pyx_memoryview_fromslice(__pyx_t_8, 1, (PyObject *(*)(char *)) __pyx_memview_get_double, (int (*)(char *, PyObject *)) __pyx_memview_set_double, 0);; if (unlikely(!__pyx_t_7)) __PYX_ERR(1, 20, __pyx_L1_error)
+      __Pyx_GOTREF(__pyx_t_7);
+      __PYX_XCLEAR_MEMVIEW(&__pyx_t_8, 1);
+      __pyx_t_8.memview = NULL; __pyx_t_8.data = NULL;
+      __pyx_t_10 = NULL;
+      __pyx_t_11 = 0;
+      #if CYTHON_UNPACK_METHODS
+      if (unlikely(PyMethod_Check(__pyx_t_6))) {
+        __pyx_t_10 = PyMethod_GET_SELF(__pyx_t_6);
+        if (likely(__pyx_t_10)) {
+          PyObject* function = PyMethod_GET_FUNCTION(__pyx_t_6);
+          __Pyx_INCREF(__pyx_t_10);
+          __Pyx_INCREF(function);
+          __Pyx_DECREF_SET(__pyx_t_6, function);
+          __pyx_t_11 = 1;
+        }
+      }
+      #endif
+      {
+        PyObject *__pyx_callargs[2] = {__pyx_t_10, __pyx_t_7};
+        __pyx_t_3 = __Pyx_PyObject_FastCall(__pyx_t_6, __pyx_callargs+1-__pyx_t_11, 1+__pyx_t_11);
+        __Pyx_XDECREF(__pyx_t_10); __pyx_t_10 = 0;
+        __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
+        if (unlikely(!__pyx_t_3)) __PYX_ERR(1, 20, __pyx_L1_error)
+        __Pyx_GOTREF(__pyx_t_3);
+        __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
+      }
+      if (unlikely((PyDict_SetItem(__pyx_v_robot_values, __pyx_v_name, __pyx_t_3) < 0))) __PYX_ERR(1, 20, __pyx_L1_error)
+      __Pyx_DECREF(__pyx_t_3); __pyx_t_3 = 0;
+
+      /* "cy_sim_utils.pyx":19
+ *         if name.startswith("body_"):
+ *             body_values[name] = np.asarray(sensorData[i:i+dim])
+ *         elif name.startswith("robot_"):             # <<<<<<<<<<<<<<
+ *             robot_values[name] = np.asarray(sensorData[i:i+dim])
+ *         i += dim
+ */
+    }
+    __pyx_L5:;
+
+    /* "cy_sim_utils.pyx":21
+ *         elif name.startswith("robot_"):
+ *             robot_values[name] = np.asarray(sensorData[i:i+dim])
  *         i += dim             # <<<<<<<<<<<<<<
- *     return values
+ *     return body_values, robot_values
  * 
  */
     __pyx_v_i = (__pyx_v_i + __pyx_v_dim);
 
-    /* "cy_sim_utils.pyx":13
+    /* "cy_sim_utils.pyx":14
  *     cdef Py_ssize_t i = 0, dim
  *     cdef str name
  *     for info in sensorInfo:             # <<<<<<<<<<<<<<
@@ -19982,38 +20126,47 @@ __pyx_t_5 = __pyx_memoryview_fromslice(__pyx_t_7, 1, (PyObject *(*)(char *)) __p
   }
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "cy_sim_utils.pyx":18
- *         values[name] = np.asarray(sensorData[i:i+dim])
+  /* "cy_sim_utils.pyx":22
+ *             robot_values[name] = np.asarray(sensorData[i:i+dim])
  *         i += dim
- *     return values             # <<<<<<<<<<<<<<
+ *     return body_values, robot_values             # <<<<<<<<<<<<<<
  * 
  * 
  */
   __Pyx_XDECREF(__pyx_r);
-  __Pyx_INCREF(__pyx_v_values);
-  __pyx_r = __pyx_v_values;
+  __pyx_t_1 = PyTuple_New(2); if (unlikely(!__pyx_t_1)) __PYX_ERR(1, 22, __pyx_L1_error)
+  __Pyx_GOTREF(__pyx_t_1);
+  __Pyx_INCREF(__pyx_v_body_values);
+  __Pyx_GIVEREF(__pyx_v_body_values);
+  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_1, 0, __pyx_v_body_values)) __PYX_ERR(1, 22, __pyx_L1_error);
+  __Pyx_INCREF(__pyx_v_robot_values);
+  __Pyx_GIVEREF(__pyx_v_robot_values);
+  if (__Pyx_PyTuple_SET_ITEM(__pyx_t_1, 1, __pyx_v_robot_values)) __PYX_ERR(1, 22, __pyx_L1_error);
+  __pyx_r = __pyx_t_1;
+  __pyx_t_1 = 0;
   goto __pyx_L0;
 
   /* "cy_sim_utils.pyx":9
  * 
- * # --- 1. Preprocesar sensores ---
+ * # --- Preprocesses drone sensors and robot sensors separately ---
  * def extract_sensor_values(double[:] sensorData, list sensorInfo):             # <<<<<<<<<<<<<<
- *     cdef dict values = {}
- *     cdef Py_ssize_t i = 0, dim
+ *     cdef dict body_values = {}
+ *     cdef dict robot_values = {}
  */
 
   /* function exit code */
   __pyx_L1_error:;
   __Pyx_XDECREF(__pyx_t_1);
   __Pyx_XDECREF(__pyx_t_3);
-  __Pyx_XDECREF(__pyx_t_5);
   __Pyx_XDECREF(__pyx_t_6);
-  __PYX_XCLEAR_MEMVIEW(&__pyx_t_7, 1);
-  __Pyx_XDECREF(__pyx_t_9);
+  __Pyx_XDECREF(__pyx_t_7);
+  __PYX_XCLEAR_MEMVIEW(&__pyx_t_8, 1);
+  __Pyx_XDECREF(__pyx_t_10);
   __Pyx_AddTraceback("cy_sim_utils.extract_sensor_values", __pyx_clineno, __pyx_lineno, __pyx_filename);
   __pyx_r = NULL;
   __pyx_L0:;
-  __Pyx_XDECREF(__pyx_v_values);
+  __Pyx_XDECREF(__pyx_v_body_values);
+  __Pyx_XDECREF(__pyx_v_robot_values);
   __Pyx_XDECREF(__pyx_v_name);
   __Pyx_XDECREF(__pyx_v_info);
   __Pyx_XGIVEREF(__pyx_r);
@@ -20021,9 +20174,9 @@ __pyx_t_5 = __pyx_memoryview_fromslice(__pyx_t_7, 1, (PyObject *(*)(char *)) __p
   return __pyx_r;
 }
 
-/* "cy_sim_utils.pyx":22
+/* "cy_sim_utils.pyx":26
  * 
- * # --- 2. Aplicar control ---
+ * # --- Applies control ---
  * def apply_control_inputs(double[:] ctrl, dict actuatorsIDs, dict controlInputs):             # <<<<<<<<<<<<<<
  *     cdef str name
  *     cdef int idx
@@ -20088,7 +20241,7 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
           (void)__Pyx_Arg_NewRef_FASTCALL(values[0]);
           kw_args--;
         }
-        else if (unlikely(PyErr_Occurred())) __PYX_ERR(1, 22, __pyx_L3_error)
+        else if (unlikely(PyErr_Occurred())) __PYX_ERR(1, 26, __pyx_L3_error)
         else goto __pyx_L5_argtuple_error;
         CYTHON_FALLTHROUGH;
         case  1:
@@ -20096,9 +20249,9 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
           (void)__Pyx_Arg_NewRef_FASTCALL(values[1]);
           kw_args--;
         }
-        else if (unlikely(PyErr_Occurred())) __PYX_ERR(1, 22, __pyx_L3_error)
+        else if (unlikely(PyErr_Occurred())) __PYX_ERR(1, 26, __pyx_L3_error)
         else {
-          __Pyx_RaiseArgtupleInvalid("apply_control_inputs", 1, 3, 3, 1); __PYX_ERR(1, 22, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("apply_control_inputs", 1, 3, 3, 1); __PYX_ERR(1, 26, __pyx_L3_error)
         }
         CYTHON_FALLTHROUGH;
         case  2:
@@ -20106,14 +20259,14 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
           (void)__Pyx_Arg_NewRef_FASTCALL(values[2]);
           kw_args--;
         }
-        else if (unlikely(PyErr_Occurred())) __PYX_ERR(1, 22, __pyx_L3_error)
+        else if (unlikely(PyErr_Occurred())) __PYX_ERR(1, 26, __pyx_L3_error)
         else {
-          __Pyx_RaiseArgtupleInvalid("apply_control_inputs", 1, 3, 3, 2); __PYX_ERR(1, 22, __pyx_L3_error)
+          __Pyx_RaiseArgtupleInvalid("apply_control_inputs", 1, 3, 3, 2); __PYX_ERR(1, 26, __pyx_L3_error)
         }
       }
       if (unlikely(kw_args > 0)) {
         const Py_ssize_t kwd_pos_args = __pyx_nargs;
-        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values + 0, kwd_pos_args, "apply_control_inputs") < 0)) __PYX_ERR(1, 22, __pyx_L3_error)
+        if (unlikely(__Pyx_ParseOptionalKeywords(__pyx_kwds, __pyx_kwvalues, __pyx_pyargnames, 0, values + 0, kwd_pos_args, "apply_control_inputs") < 0)) __PYX_ERR(1, 26, __pyx_L3_error)
       }
     } else if (unlikely(__pyx_nargs != 3)) {
       goto __pyx_L5_argtuple_error;
@@ -20122,13 +20275,13 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
       values[1] = __Pyx_Arg_FASTCALL(__pyx_args, 1);
       values[2] = __Pyx_Arg_FASTCALL(__pyx_args, 2);
     }
-    __pyx_v_ctrl = __Pyx_PyObject_to_MemoryviewSlice_ds_double(values[0], PyBUF_WRITABLE); if (unlikely(!__pyx_v_ctrl.memview)) __PYX_ERR(1, 22, __pyx_L3_error)
+    __pyx_v_ctrl = __Pyx_PyObject_to_MemoryviewSlice_ds_double(values[0], PyBUF_WRITABLE); if (unlikely(!__pyx_v_ctrl.memview)) __PYX_ERR(1, 26, __pyx_L3_error)
     __pyx_v_actuatorsIDs = ((PyObject*)values[1]);
     __pyx_v_controlInputs = ((PyObject*)values[2]);
   }
   goto __pyx_L6_skip;
   __pyx_L5_argtuple_error:;
-  __Pyx_RaiseArgtupleInvalid("apply_control_inputs", 1, 3, 3, __pyx_nargs); __PYX_ERR(1, 22, __pyx_L3_error)
+  __Pyx_RaiseArgtupleInvalid("apply_control_inputs", 1, 3, 3, __pyx_nargs); __PYX_ERR(1, 26, __pyx_L3_error)
   __pyx_L6_skip:;
   goto __pyx_L4_argument_unpacking_done;
   __pyx_L3_error:;
@@ -20143,8 +20296,8 @@ PyObject *__pyx_args, PyObject *__pyx_kwds
   __Pyx_RefNannyFinishContext();
   return NULL;
   __pyx_L4_argument_unpacking_done:;
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_actuatorsIDs), (&PyDict_Type), 1, "actuatorsIDs", 1))) __PYX_ERR(1, 22, __pyx_L1_error)
-  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_controlInputs), (&PyDict_Type), 1, "controlInputs", 1))) __PYX_ERR(1, 22, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_actuatorsIDs), (&PyDict_Type), 1, "actuatorsIDs", 1))) __PYX_ERR(1, 26, __pyx_L1_error)
+  if (unlikely(!__Pyx_ArgTypeTest(((PyObject *)__pyx_v_controlInputs), (&PyDict_Type), 1, "controlInputs", 1))) __PYX_ERR(1, 26, __pyx_L1_error)
   __pyx_r = __pyx_pf_12cy_sim_utils_2apply_control_inputs(__pyx_self, __pyx_v_ctrl, __pyx_v_actuatorsIDs, __pyx_v_controlInputs);
 
   /* function exit code */
@@ -20184,7 +20337,7 @@ static PyObject *__pyx_pf_12cy_sim_utils_2apply_control_inputs(CYTHON_UNUSED PyO
   int __pyx_clineno = 0;
   __Pyx_RefNannySetupContext("apply_control_inputs", 1);
 
-  /* "cy_sim_utils.pyx":25
+  /* "cy_sim_utils.pyx":29
  *     cdef str name
  *     cdef int idx
  *     for name, value in controlInputs.items():             # <<<<<<<<<<<<<<
@@ -20194,9 +20347,9 @@ static PyObject *__pyx_pf_12cy_sim_utils_2apply_control_inputs(CYTHON_UNUSED PyO
   __pyx_t_2 = 0;
   if (unlikely(__pyx_v_controlInputs == Py_None)) {
     PyErr_Format(PyExc_AttributeError, "'NoneType' object has no attribute '%.30s'", "items");
-    __PYX_ERR(1, 25, __pyx_L1_error)
+    __PYX_ERR(1, 29, __pyx_L1_error)
   }
-  __pyx_t_5 = __Pyx_dict_iterator(__pyx_v_controlInputs, 1, __pyx_n_s_items, (&__pyx_t_3), (&__pyx_t_4)); if (unlikely(!__pyx_t_5)) __PYX_ERR(1, 25, __pyx_L1_error)
+  __pyx_t_5 = __Pyx_dict_iterator(__pyx_v_controlInputs, 1, __pyx_n_s_items, (&__pyx_t_3), (&__pyx_t_4)); if (unlikely(!__pyx_t_5)) __PYX_ERR(1, 29, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_5);
   __Pyx_XDECREF(__pyx_t_1);
   __pyx_t_1 = __pyx_t_5;
@@ -20204,16 +20357,16 @@ static PyObject *__pyx_pf_12cy_sim_utils_2apply_control_inputs(CYTHON_UNUSED PyO
   while (1) {
     __pyx_t_7 = __Pyx_dict_iter_next(__pyx_t_1, __pyx_t_3, &__pyx_t_2, &__pyx_t_5, &__pyx_t_6, NULL, __pyx_t_4);
     if (unlikely(__pyx_t_7 == 0)) break;
-    if (unlikely(__pyx_t_7 == -1)) __PYX_ERR(1, 25, __pyx_L1_error)
+    if (unlikely(__pyx_t_7 == -1)) __PYX_ERR(1, 29, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_5);
     __Pyx_GOTREF(__pyx_t_6);
-    if (!(likely(PyUnicode_CheckExact(__pyx_t_5))||((__pyx_t_5) == Py_None) || __Pyx_RaiseUnexpectedTypeError("unicode", __pyx_t_5))) __PYX_ERR(1, 25, __pyx_L1_error)
+    if (!(likely(PyUnicode_CheckExact(__pyx_t_5))||((__pyx_t_5) == Py_None) || __Pyx_RaiseUnexpectedTypeError("unicode", __pyx_t_5))) __PYX_ERR(1, 29, __pyx_L1_error)
     __Pyx_XDECREF_SET(__pyx_v_name, ((PyObject*)__pyx_t_5));
     __pyx_t_5 = 0;
     __Pyx_XDECREF_SET(__pyx_v_value, __pyx_t_6);
     __pyx_t_6 = 0;
 
-    /* "cy_sim_utils.pyx":26
+    /* "cy_sim_utils.pyx":30
  *     cdef int idx
  *     for name, value in controlInputs.items():
  *         idx = actuatorsIDs.get(name, -1)             # <<<<<<<<<<<<<<
@@ -20222,15 +20375,15 @@ static PyObject *__pyx_pf_12cy_sim_utils_2apply_control_inputs(CYTHON_UNUSED PyO
  */
     if (unlikely(__pyx_v_actuatorsIDs == Py_None)) {
       PyErr_Format(PyExc_AttributeError, "'NoneType' object has no attribute '%.30s'", "get");
-      __PYX_ERR(1, 26, __pyx_L1_error)
+      __PYX_ERR(1, 30, __pyx_L1_error)
     }
-    __pyx_t_6 = __Pyx_PyDict_GetItemDefault(__pyx_v_actuatorsIDs, __pyx_v_name, __pyx_int_neg_1); if (unlikely(!__pyx_t_6)) __PYX_ERR(1, 26, __pyx_L1_error)
+    __pyx_t_6 = __Pyx_PyDict_GetItemDefault(__pyx_v_actuatorsIDs, __pyx_v_name, __pyx_int_neg_1); if (unlikely(!__pyx_t_6)) __PYX_ERR(1, 30, __pyx_L1_error)
     __Pyx_GOTREF(__pyx_t_6);
-    __pyx_t_7 = __Pyx_PyInt_As_int(__pyx_t_6); if (unlikely((__pyx_t_7 == (int)-1) && PyErr_Occurred())) __PYX_ERR(1, 26, __pyx_L1_error)
+    __pyx_t_7 = __Pyx_PyInt_As_int(__pyx_t_6); if (unlikely((__pyx_t_7 == (int)-1) && PyErr_Occurred())) __PYX_ERR(1, 30, __pyx_L1_error)
     __Pyx_DECREF(__pyx_t_6); __pyx_t_6 = 0;
     __pyx_v_idx = __pyx_t_7;
 
-    /* "cy_sim_utils.pyx":27
+    /* "cy_sim_utils.pyx":31
  *     for name, value in controlInputs.items():
  *         idx = actuatorsIDs.get(name, -1)
  *         if idx >= 0:             # <<<<<<<<<<<<<<
@@ -20239,16 +20392,16 @@ static PyObject *__pyx_pf_12cy_sim_utils_2apply_control_inputs(CYTHON_UNUSED PyO
     __pyx_t_8 = (__pyx_v_idx >= 0);
     if (__pyx_t_8) {
 
-      /* "cy_sim_utils.pyx":28
+      /* "cy_sim_utils.pyx":32
  *         idx = actuatorsIDs.get(name, -1)
  *         if idx >= 0:
  *             ctrl[idx] = value             # <<<<<<<<<<<<<<
  */
-      __pyx_t_9 = __pyx_PyFloat_AsDouble(__pyx_v_value); if (unlikely((__pyx_t_9 == (double)-1) && PyErr_Occurred())) __PYX_ERR(1, 28, __pyx_L1_error)
+      __pyx_t_9 = __pyx_PyFloat_AsDouble(__pyx_v_value); if (unlikely((__pyx_t_9 == (double)-1) && PyErr_Occurred())) __PYX_ERR(1, 32, __pyx_L1_error)
       __pyx_t_10 = __pyx_v_idx;
       *((double *) ( /* dim=0 */ (__pyx_v_ctrl.data + __pyx_t_10 * __pyx_v_ctrl.strides[0]) )) = __pyx_t_9;
 
-      /* "cy_sim_utils.pyx":27
+      /* "cy_sim_utils.pyx":31
  *     for name, value in controlInputs.items():
  *         idx = actuatorsIDs.get(name, -1)
  *         if idx >= 0:             # <<<<<<<<<<<<<<
@@ -20258,9 +20411,9 @@ static PyObject *__pyx_pf_12cy_sim_utils_2apply_control_inputs(CYTHON_UNUSED PyO
   }
   __Pyx_DECREF(__pyx_t_1); __pyx_t_1 = 0;
 
-  /* "cy_sim_utils.pyx":22
+  /* "cy_sim_utils.pyx":26
  * 
- * # --- 2. Aplicar control ---
+ * # --- Applies control ---
  * def apply_control_inputs(double[:] ctrl, dict actuatorsIDs, dict controlInputs):             # <<<<<<<<<<<<<<
  *     cdef str name
  *     cdef int idx
@@ -21302,6 +21455,8 @@ static int __Pyx_CreateStringTabAndInitStrings(void) {
     {&__pyx_n_s_asarray, __pyx_k_asarray, sizeof(__pyx_k_asarray), 0, 0, 1, 1},
     {&__pyx_n_s_asyncio_coroutines, __pyx_k_asyncio_coroutines, sizeof(__pyx_k_asyncio_coroutines), 0, 0, 1, 1},
     {&__pyx_n_s_base, __pyx_k_base, sizeof(__pyx_k_base), 0, 0, 1, 1},
+    {&__pyx_n_u_body, __pyx_k_body, sizeof(__pyx_k_body), 0, 1, 0, 1},
+    {&__pyx_n_s_body_values, __pyx_k_body_values, sizeof(__pyx_k_body_values), 0, 0, 1, 1},
     {&__pyx_n_s_c, __pyx_k_c, sizeof(__pyx_k_c), 0, 0, 1, 1},
     {&__pyx_n_u_c, __pyx_k_c, sizeof(__pyx_k_c), 0, 1, 0, 1},
     {&__pyx_n_s_class, __pyx_k_class, sizeof(__pyx_k_class), 0, 0, 1, 1},
@@ -21373,6 +21528,8 @@ static int __Pyx_CreateStringTabAndInitStrings(void) {
     {&__pyx_n_s_reduce_cython, __pyx_k_reduce_cython, sizeof(__pyx_k_reduce_cython), 0, 0, 1, 1},
     {&__pyx_n_s_reduce_ex, __pyx_k_reduce_ex, sizeof(__pyx_k_reduce_ex), 0, 0, 1, 1},
     {&__pyx_n_s_register, __pyx_k_register, sizeof(__pyx_k_register), 0, 0, 1, 1},
+    {&__pyx_n_u_robot, __pyx_k_robot, sizeof(__pyx_k_robot), 0, 1, 0, 1},
+    {&__pyx_n_s_robot_values, __pyx_k_robot_values, sizeof(__pyx_k_robot_values), 0, 0, 1, 1},
     {&__pyx_n_s_sensorData, __pyx_k_sensorData, sizeof(__pyx_k_sensorData), 0, 0, 1, 1},
     {&__pyx_n_s_sensorInfo, __pyx_k_sensorInfo, sizeof(__pyx_k_sensorInfo), 0, 0, 1, 1},
     {&__pyx_n_s_setstate, __pyx_k_setstate, sizeof(__pyx_k_setstate), 0, 0, 1, 1},
@@ -21395,7 +21552,6 @@ static int __Pyx_CreateStringTabAndInitStrings(void) {
     {&__pyx_n_s_unpack, __pyx_k_unpack, sizeof(__pyx_k_unpack), 0, 0, 1, 1},
     {&__pyx_n_s_update, __pyx_k_update, sizeof(__pyx_k_update), 0, 0, 1, 1},
     {&__pyx_n_s_value, __pyx_k_value, sizeof(__pyx_k_value), 0, 0, 1, 1},
-    {&__pyx_n_s_values, __pyx_k_values, sizeof(__pyx_k_values), 0, 0, 1, 1},
     {&__pyx_n_s_version_info, __pyx_k_version_info, sizeof(__pyx_k_version_info), 0, 0, 1, 1},
     {0, 0, 0, 0, 0, 0, 0}
   };
@@ -21585,27 +21741,27 @@ static CYTHON_SMALL_CODE int __Pyx_InitCachedConstants(void) {
 
   /* "cy_sim_utils.pyx":9
  * 
- * # --- 1. Preprocesar sensores ---
+ * # --- Preprocesses drone sensors and robot sensors separately ---
  * def extract_sensor_values(double[:] sensorData, list sensorInfo):             # <<<<<<<<<<<<<<
- *     cdef dict values = {}
- *     cdef Py_ssize_t i = 0, dim
+ *     cdef dict body_values = {}
+ *     cdef dict robot_values = {}
  */
-  __pyx_tuple__22 = PyTuple_Pack(7, __pyx_n_s_sensorData, __pyx_n_s_sensorInfo, __pyx_n_s_values, __pyx_n_s_i, __pyx_n_s_dim, __pyx_n_s_name, __pyx_n_s_info); if (unlikely(!__pyx_tuple__22)) __PYX_ERR(1, 9, __pyx_L1_error)
+  __pyx_tuple__22 = PyTuple_Pack(8, __pyx_n_s_sensorData, __pyx_n_s_sensorInfo, __pyx_n_s_body_values, __pyx_n_s_robot_values, __pyx_n_s_i, __pyx_n_s_dim, __pyx_n_s_name, __pyx_n_s_info); if (unlikely(!__pyx_tuple__22)) __PYX_ERR(1, 9, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__22);
   __Pyx_GIVEREF(__pyx_tuple__22);
-  __pyx_codeobj__23 = (PyObject*)__Pyx_PyCode_New(2, 0, 0, 7, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__22, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_cy_sim_utils_pyx, __pyx_n_s_extract_sensor_values, 9, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__23)) __PYX_ERR(1, 9, __pyx_L1_error)
+  __pyx_codeobj__23 = (PyObject*)__Pyx_PyCode_New(2, 0, 0, 8, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__22, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_cy_sim_utils_pyx, __pyx_n_s_extract_sensor_values, 9, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__23)) __PYX_ERR(1, 9, __pyx_L1_error)
 
-  /* "cy_sim_utils.pyx":22
+  /* "cy_sim_utils.pyx":26
  * 
- * # --- 2. Aplicar control ---
+ * # --- Applies control ---
  * def apply_control_inputs(double[:] ctrl, dict actuatorsIDs, dict controlInputs):             # <<<<<<<<<<<<<<
  *     cdef str name
  *     cdef int idx
  */
-  __pyx_tuple__24 = PyTuple_Pack(6, __pyx_n_s_ctrl, __pyx_n_s_actuatorsIDs, __pyx_n_s_controlInputs, __pyx_n_s_name, __pyx_n_s_idx, __pyx_n_s_value); if (unlikely(!__pyx_tuple__24)) __PYX_ERR(1, 22, __pyx_L1_error)
+  __pyx_tuple__24 = PyTuple_Pack(6, __pyx_n_s_ctrl, __pyx_n_s_actuatorsIDs, __pyx_n_s_controlInputs, __pyx_n_s_name, __pyx_n_s_idx, __pyx_n_s_value); if (unlikely(!__pyx_tuple__24)) __PYX_ERR(1, 26, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_tuple__24);
   __Pyx_GIVEREF(__pyx_tuple__24);
-  __pyx_codeobj__25 = (PyObject*)__Pyx_PyCode_New(3, 0, 0, 6, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__24, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_cy_sim_utils_pyx, __pyx_n_s_apply_control_inputs, 22, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__25)) __PYX_ERR(1, 22, __pyx_L1_error)
+  __pyx_codeobj__25 = (PyObject*)__Pyx_PyCode_New(3, 0, 0, 6, 0, CO_OPTIMIZED|CO_NEWLOCALS, __pyx_empty_bytes, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_tuple__24, __pyx_empty_tuple, __pyx_empty_tuple, __pyx_kp_s_cy_sim_utils_pyx, __pyx_n_s_apply_control_inputs, 26, __pyx_empty_bytes); if (unlikely(!__pyx_codeobj__25)) __PYX_ERR(1, 26, __pyx_L1_error)
   __Pyx_RefNannyFinishContext();
   return 0;
   __pyx_L1_error:;
@@ -22729,26 +22885,26 @@ if (!__Pyx_RefNanny) {
 
   /* "cy_sim_utils.pyx":9
  * 
- * # --- 1. Preprocesar sensores ---
+ * # --- Preprocesses drone sensors and robot sensors separately ---
  * def extract_sensor_values(double[:] sensorData, list sensorInfo):             # <<<<<<<<<<<<<<
- *     cdef dict values = {}
- *     cdef Py_ssize_t i = 0, dim
+ *     cdef dict body_values = {}
+ *     cdef dict robot_values = {}
  */
   __pyx_t_7 = __Pyx_CyFunction_New(&__pyx_mdef_12cy_sim_utils_1extract_sensor_values, 0, __pyx_n_s_extract_sensor_values, NULL, __pyx_n_s_cy_sim_utils, __pyx_d, ((PyObject *)__pyx_codeobj__23)); if (unlikely(!__pyx_t_7)) __PYX_ERR(1, 9, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_7);
   if (PyDict_SetItem(__pyx_d, __pyx_n_s_extract_sensor_values, __pyx_t_7) < 0) __PYX_ERR(1, 9, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
 
-  /* "cy_sim_utils.pyx":22
+  /* "cy_sim_utils.pyx":26
  * 
- * # --- 2. Aplicar control ---
+ * # --- Applies control ---
  * def apply_control_inputs(double[:] ctrl, dict actuatorsIDs, dict controlInputs):             # <<<<<<<<<<<<<<
  *     cdef str name
  *     cdef int idx
  */
-  __pyx_t_7 = __Pyx_CyFunction_New(&__pyx_mdef_12cy_sim_utils_3apply_control_inputs, 0, __pyx_n_s_apply_control_inputs, NULL, __pyx_n_s_cy_sim_utils, __pyx_d, ((PyObject *)__pyx_codeobj__25)); if (unlikely(!__pyx_t_7)) __PYX_ERR(1, 22, __pyx_L1_error)
+  __pyx_t_7 = __Pyx_CyFunction_New(&__pyx_mdef_12cy_sim_utils_3apply_control_inputs, 0, __pyx_n_s_apply_control_inputs, NULL, __pyx_n_s_cy_sim_utils, __pyx_d, ((PyObject *)__pyx_codeobj__25)); if (unlikely(!__pyx_t_7)) __PYX_ERR(1, 26, __pyx_L1_error)
   __Pyx_GOTREF(__pyx_t_7);
-  if (PyDict_SetItem(__pyx_d, __pyx_n_s_apply_control_inputs, __pyx_t_7) < 0) __PYX_ERR(1, 22, __pyx_L1_error)
+  if (PyDict_SetItem(__pyx_d, __pyx_n_s_apply_control_inputs, __pyx_t_7) < 0) __PYX_ERR(1, 26, __pyx_L1_error)
   __Pyx_DECREF(__pyx_t_7); __pyx_t_7 = 0;
 
   /* "cy_sim_utils.pyx":1
@@ -25243,6 +25399,35 @@ static CYTHON_INLINE int __Pyx_HasAttr(PyObject *o, PyObject *n) {
         Py_DECREF(r);
         return 1;
     }
+}
+
+/* unicode_tailmatch */
+static int __Pyx_PyUnicode_TailmatchTuple(PyObject* s, PyObject* substrings,
+                                          Py_ssize_t start, Py_ssize_t end, int direction) {
+    Py_ssize_t i, count = PyTuple_GET_SIZE(substrings);
+    for (i = 0; i < count; i++) {
+        Py_ssize_t result;
+#if CYTHON_ASSUME_SAFE_MACROS && !CYTHON_AVOID_BORROWED_REFS
+        result = PyUnicode_Tailmatch(s, PyTuple_GET_ITEM(substrings, i),
+                                     start, end, direction);
+#else
+        PyObject* sub = PySequence_ITEM(substrings, i);
+        if (unlikely(!sub)) return -1;
+        result = PyUnicode_Tailmatch(s, sub, start, end, direction);
+        Py_DECREF(sub);
+#endif
+        if (result) {
+            return (int) result;
+        }
+    }
+    return 0;
+}
+static int __Pyx_PyUnicode_Tailmatch(PyObject* s, PyObject* substr,
+                                     Py_ssize_t start, Py_ssize_t end, int direction) {
+    if (unlikely(PyTuple_Check(substr))) {
+        return __Pyx_PyUnicode_TailmatchTuple(s, substr, start, end, direction);
+    }
+    return (int) PyUnicode_Tailmatch(s, substr, start, end, direction);
 }
 
 /* IterFinish */

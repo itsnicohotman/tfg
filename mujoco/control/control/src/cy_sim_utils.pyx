@@ -5,20 +5,24 @@
 import numpy as np
 cimport numpy as cnp
 
-# --- 1. Preprocesar sensores ---
+# --- Preprocesses drone sensors and robot sensors separately ---
 def extract_sensor_values(double[:] sensorData, list sensorInfo):
-    cdef dict values = {}
+    cdef dict body_values = {}
+    cdef dict robot_values = {}
     cdef Py_ssize_t i = 0, dim
     cdef str name
     for info in sensorInfo:
         name = info[0]
         dim = info[1]
-        values[name] = np.asarray(sensorData[i:i+dim])
+        if name.startswith("body_"):
+            body_values[name] = np.asarray(sensorData[i:i+dim])
+        elif name.startswith("robot_"):
+            robot_values[name] = np.asarray(sensorData[i:i+dim])
         i += dim
-    return values
+    return body_values, robot_values
 
 
-# --- 2. Aplicar control ---
+# --- Applies control ---
 def apply_control_inputs(double[:] ctrl, dict actuatorsIDs, dict controlInputs):
     cdef str name
     cdef int idx
