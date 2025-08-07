@@ -34,6 +34,7 @@ class RobotSensorData:
         dict  # Dictionary with sensor values: key=sensor's name, value=sensor's value
     )
     manipulatorPosition: list[float, float, float]  # Manipulator's position
+    dronePosition: list[float, float, float]  # Drone's position
 
 
 @dataclass

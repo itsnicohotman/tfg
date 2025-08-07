@@ -156,6 +156,7 @@ class MujocoSimulation(threading.Thread):
                 timestep=self._model.opt.timestep,
                 sensorValues=robotSensorValues,
                 manipulatorPosition=manipulatorGlobalPosition,
+                dronePosition=droneGlobalPosition,
             )
 
             self._droneController.setSensorData(sensorDataMessage)
@@ -185,6 +186,8 @@ class MujocoSimulation(threading.Thread):
                 mujoco.mj_step(self._model, self._data)
             if not self._droneController._updateEvent.is_set():
                 self._droneController.setUpdateEvent()
+            if not self._swayController._updateEvent.is_set():
+                self._swayController.setUpdateEvent()
 
             if timeDebug:
                 t3 = time.time()

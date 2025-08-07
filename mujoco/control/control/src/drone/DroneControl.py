@@ -117,7 +117,6 @@ class DroneControl(threading.Thread):
         self._currentVelocity = np.zeros(3)
         self._currentOrientation = np.zeros(4)
         self._currentTargetPosition = np.zeros(3)
-        self._currentTargetVelocity = np.zeros(3)
 
         self._debugging = False
         self._debug = False
