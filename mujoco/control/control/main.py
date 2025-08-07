@@ -6,6 +6,7 @@ from src.MujocoSimulation import MujocoSimulation
 from src.GroundControlStation import GCS
 from src.TaskManager import TaskManager
 from src.drone.DroneControl import DroneControl
+from src.manipulator.SwayControl import SwayControl
 
 # from modules.sway_control import SwayControl
 import time
@@ -30,7 +31,7 @@ def main():
     droneControlQueue = queue.Queue()  # receives from TaskManager Thread
 
     # Instantiate modules
-    # swayControl = SwayControl(pubsub, shutdownEvent)
+    swayController = SwayControl(shutdownEvent)
 
     # Initialize DroneControl in a separate thread.
     droneController = DroneControl(
@@ -51,9 +52,11 @@ def main():
         shutdownEvent,
         model,
         droneController,
+        swayController=swayController,
     )
     mujocoSim.start()
     droneController.start()
+    swayController.start()
 
     try:
         gcs.checkShutdown()
@@ -69,6 +72,8 @@ def main():
     taskManager.join()
     droneController.stop()
     droneController.join()
+    swayController.stop()
+    swayController.join()
     mujocoSim.stop()
     mujocoSim.join()
 

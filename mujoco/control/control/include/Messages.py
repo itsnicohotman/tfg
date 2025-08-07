@@ -24,9 +24,23 @@ class SensorData:
         dict  # Dictionary with sensor values: key=sensor's name, value=sensor's value
     )
     dronePosition: list[float, float, float]  # Drone's position
+
+
+@dataclass
+class RobotSensorData:
+    timestamp: float  # Timestamp of the current simulation moment
+    timestep: float  # Simulation's timestep
+    sensorValues: (
+        dict  # Dictionary with sensor values: key=sensor's name, value=sensor's value
+    )
     manipulatorPosition: list[float, float, float]  # Manipulator's position
 
 
 @dataclass
 class ControlAction:
     droneThrusters: dict  # Dictionary with drone's control values: key=thruster name, value=action value
+
+
+@dataclass
+class RobotControlAction:
+    jointMotors: dict  # Dictionary with manipulator's control values: key=motor name, value=action value

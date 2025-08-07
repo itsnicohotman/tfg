@@ -7,9 +7,15 @@ import mujoco
 import mujoco.viewer
 import threading
 import numpy as np
-from include.Messages import SensorData, ControlAction
+from include.Messages import (
+    SensorData,
+    ControlAction,
+    RobotControlAction,
+    RobotSensorData,
+)
 import time
 from src.drone.DroneControl import DroneControl
+from src.manipulator.SwayControl import SwayControl
 from cy_sim_utils import extract_sensor_values, apply_control_inputs
 
 
@@ -19,9 +25,11 @@ class MujocoSimulation(threading.Thread):
         shutdownEvent: threading.Event,
         model,
         droneController: DroneControl,
+        swayController: SwayControl,
     ):
         super().__init__()  # Start thread
         self._droneController = droneController
+        self._swayController = swayController
         match model:
             case "drone":
                 MODEL_PATH = "/home/nicolas/tfg/mujoco/model/drone/Model_GRVC_Drone.xml"
@@ -86,7 +94,6 @@ class MujocoSimulation(threading.Thread):
         self._viewerThread.start()
 
         # Initialize key variables
-        sensorValues = {}
         droneID = mujoco.mj_name2id(self._model, mujoco.mjtObj.mjOBJ_BODY, "drone")
         if droneID == -1:
             raise RuntimeError("Body 'drone' not found in model.")
@@ -132,18 +139,27 @@ class MujocoSimulation(threading.Thread):
                     f"[MujocoSimulation] Initial Manipulator position: {manipulatorGlobalPosition}, Initial Drone position: {droneGlobalPosition}"
                 )
 
-            sensorValues = extract_sensor_values(sensorData, self._sensorInfo)
+            droneSensorValues, robotSensorValues = extract_sensor_values(
+                sensorData, self._sensorInfo
+            )
 
             manipulatorGlobalPosition = [0, 0, 0]
             sensorDataMessage = SensorData(
                 timestamp=currentTimestamp,
                 timestep=self._model.opt.timestep,
-                sensorValues=sensorValues,
+                sensorValues=droneSensorValues,
                 dronePosition=droneGlobalPosition,
+            )
+
+            robotSensorDataMessage = RobotSensorData(
+                timestamp=currentTimestamp,
+                timestep=self._model.opt.timestep,
+                sensorValues=robotSensorValues,
                 manipulatorPosition=manipulatorGlobalPosition,
             )
 
             self._droneController.setSensorData(sensorDataMessage)
+            self._swayController.setSensorData(robotSensorDataMessage)
             if debug:
                 print(f"[MujocoSimulation] sensorDataMessage: {sensorDataMessage}")
 

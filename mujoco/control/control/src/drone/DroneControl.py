@@ -91,7 +91,6 @@ class DroneControl(threading.Thread):
             },
             # subtreeMass=0.0,
             dronePosition=[0.0, 0.0, 0.45],
-            manipulatorPosition=[0.0, 0.0, 0.0],
         )
         self._sensorData: SensorData = None
         self._sensorLock = threading.Lock()
@@ -113,7 +112,6 @@ class DroneControl(threading.Thread):
         self._timestep = 0.001
         self._previousTimestamp = 0.0
         self._currentPosition = np.zeros(3)
-        self._currentCOM = np.zeros(3)
         self._currentAcceleration = np.zeros(3)
         self._currentAngularVelocity = np.zeros(3)
         self._currentVelocity = np.zeros(3)
@@ -200,7 +198,6 @@ class DroneControl(threading.Thread):
                 sensorData.sensorValues["body_gyro"]
             )
             self._currentOrientation = np.array(sensorData.sensorValues["body_quat"])
-            self._currentCOM = np.array(sensorData.sensorValues["drone_load_com"])
             self._currentVelocity = np.array(sensorData.sensorValues["body_vel"])
             self._currentTargetPosition = np.array(
                 [
