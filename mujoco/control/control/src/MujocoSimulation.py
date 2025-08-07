@@ -16,7 +16,9 @@ from include.Messages import (
 import time
 from src.drone.DroneControl import DroneControl
 from src.manipulator.SwayControl import SwayControl
-from cy_sim_utils import extract_sensor_values, apply_control_inputs
+
+from cython_modules.cy_sim_utils import extract_sensor_values, apply_control_inputs
+from cython_modules.fast_mujoco_utils import extract_data
 
 
 class MujocoSimulation(threading.Thread):
@@ -70,6 +72,15 @@ class MujocoSimulation(threading.Thread):
         self._actuatorsIDs = {
             self._model.actuator(i).name: i for i in range(self._model.nu)
         }
+
+        self._licasJoints = ["q11", "q12", "q13", "q14", "q21", "q22", "q23", "q24"]
+        self._jointIndices = [
+            self._model.joint(name).qposadr for name in self._licasJoints
+        ]
+        self._velocityIndices = [
+            self._model.joint(name).dofadr for name in self._licasJoints
+        ]
+        self._fastReader = FastSensorReader(self._jointIndices, self._velocityIndices)
 
         self._sensorInfo = []
         for i in range(self._model.nsensor):
@@ -127,12 +138,14 @@ class MujocoSimulation(threading.Thread):
             # --- Get sensor data and send to DroneControl thread ---
             ###########################################################
             with self._dataLock:
-                droneGlobalPosition = np.copy(self._data.xpos[droneID])
-                manipulatorGlobalPosition = np.copy(self._data.xpos[manipulatorID])
-                currentTimestamp = self._data.time
+                (
+                    droneGlobalPosition,
+                    manipulatorGlobalPosition,
+                    qpos,
+                    qvel,
+                    currentTimestamp,
+                ) = self._fastReader.read(self._data, droneID, manipulatorID)
                 sensorData = np.copy(self._data.sensordata)
-                if debug:
-                    print("[MujocoSimulation] Data locked at sensor.")
 
             if iteration == 1:
                 print(
@@ -296,3 +309,22 @@ class MujocoSimulation(threading.Thread):
 
 if __name__ == "__main__":
     MujocoSimulation.run()
+
+
+class FastSensorReader:
+    def __init__(self, jointIndices, velocityIndices):
+        self.jointIndices = np.array(jointIndices, dtype=np.int32)
+        self.velocityIndices = np.array(velocityIndices, dtype=np.int32)
+
+    def read(self, data, droneId, manipulatorId):
+
+        return extract_data(
+            data.xpos,
+            droneId,
+            manipulatorId,
+            data.qpos,
+            data.qvel,
+            self.jointIndices,
+            self.velocityIndices,
+            data.time,
+        )
