@@ -20,3 +20,14 @@ Otro Material/
 Progreso_TFG_NicolasHofmann/
 Progreso_TFG_NicolasHofmann.zip
 drone_demo.mkv
+mujoco/control/cython_modules/__pycache__/
+mujoco/control/cython_modules/fast_mujoco_utils.c
+mujoco/control/cython_modules/fast_mujoco_utils.cpp
+mujoco/control/cython_modules/fast_mujoco_utils.cpython-312-x86_64-linux-gnu.so
+mujoco/control/cython_modules/cy_sim_utils.c
+mujoco/control/cython_modules/cy_sim_utils.cpp
+mujoco/control/cython_modules/cy_sim_utils.cpython-312-x86_64-linux-gnu.so
+mujoco/control/cython_modules.egg-info/
+mujoco/control/control/src/manipulator/Alejandro
+mujoco/control/control/src/manipulator/__pycache__/
+mujoco/control/build/
