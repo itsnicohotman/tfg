@@ -90,7 +90,7 @@ class MujocoSimulation(threading.Thread):
 
         self._dataLock = threading.Lock()
 
-        self._timeDebugging = True
+        self._timeDebugging = False
         self._debugging = False
 
     def run(self):
@@ -170,6 +170,8 @@ class MujocoSimulation(threading.Thread):
                 sensorValues=robotSensorValues,
                 manipulatorPosition=manipulatorGlobalPosition,
                 dronePosition=droneGlobalPosition,
+                jointsPosition=qpos,
+                jointsVelocity=qvel,
             )
 
             self._droneController.setSensorData(sensorDataMessage)

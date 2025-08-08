@@ -35,6 +35,12 @@ class RobotSensorData:
     )
     manipulatorPosition: list[float, float, float]  # Manipulator's position
     dronePosition: list[float, float, float]  # Drone's position
+    jointsPosition: list[
+        float, float, float, float, float, float, float, float
+    ]  # Joints position (qpos)
+    jointsVelocity: list[
+        float, float, float, float, float, float, float, float
+    ]  # Joints velocity (qvel)
 
 
 @dataclass

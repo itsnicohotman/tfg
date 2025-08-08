@@ -105,11 +105,11 @@
     
   </worldbody>
   <actuator>
-    <motor name="left_shoulder_roll" joint="q11" gear="10" ctrlrange="-2 2" ctrllimited="true"/>
+    <motor name="left_shoulder_roll" joint="q11" gear="20" ctrlrange="-1 1" ctrllimited="true"/>
     <motor name="left_shoulder_pitch" joint="q12" gear="10" ctrlrange="-1 1" ctrllimited="true"/>
     <motor name="left_elbow_roll" joint="q13" gear="10" ctrlrange="-1 1" ctrllimited="true"/>
     <motor name="left_elbow_pitch" joint="q14" gear="10" ctrlrange="-1 1" ctrllimited="true"/>
-    <motor name="right_shoulder_roll" joint="q21" gear="10" ctrlrange="-2 2" ctrllimited="true"/>
+    <motor name="right_shoulder_roll" joint="q21" gear="20" ctrlrange="-1 1" ctrllimited="true"/>
     <motor name="right_shoulder_pitch" joint="q22" gear="10" ctrlrange="-1 1" ctrllimited="true"/>
     <motor name="right_elbow_roll" joint="q23" gear="10" ctrlrange="-1 1" ctrllimited="true"/>
     <motor name="right_elbow_pitch" joint="q24" gear="10" ctrlrange="-1 1" ctrllimited="true"/>
