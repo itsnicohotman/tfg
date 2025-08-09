@@ -43,7 +43,7 @@ class SwayControl(threading.Thread):
         # Joint Velocity -> Joint Torque PID Controller - 5 times faster than position PID
         vKp = np.array([1, 1, 10, 10, 1, 1, 10, 10], dtype=np.float64)
         vKi = np.array([1, 1, 5, 5, 1, 1, 5, 5], dtype=np.float64)
-        vKd = np.array([0, 0, 0, 0.01, 0, 0, 0, 0], dtype=np.float64)
+        vKd = np.array([0, 0, 0, 0.01, 0, 0, 0, 0.01], dtype=np.float64)
         self._MAX_TORQUE = 1.0  # Maximum torque for the motors
         self._velocityPID = PIDController(
             kp=vKp,
