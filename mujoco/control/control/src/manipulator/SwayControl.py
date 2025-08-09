@@ -282,18 +282,22 @@ class SwayControl(threading.Thread):
         self._updateEvent.set()
 
     def graphResults(self):
-        # Create output directory if it doesn't exist
-        output_dir = "/home/nicolas/tfg/Memoria/GraficasRobot"
-        os.makedirs(output_dir, exist_ok=True)
+        # Directorios de guardado
+        dir_left = "/home/nicolas/tfg/Memoria/GraficasRobot/BrazoIzquierdo"
+        dir_right = "/home/nicolas/tfg/Memoria/GraficasRobot/BrazoDerecho"
+        os.makedirs(dir_left, exist_ok=True)
+        os.makedirs(dir_right, exist_ok=True)
         matplotlib.use("Agg")
 
+        # Convertir a arrays
         time = np.array(self._historyTime)
-        qPos = np.array(self._historyQPosition)  # shape: (steps, joints)
-        qPosRef = np.array(self._historyQPositionReference)  # shape: (steps, joints)
-        qVel = np.array(self._historyQVelocity)
-        qVelRef = np.array(self._historyQVelocityReference)
+        q_pos = np.array(self._historyQPosition)
+        q_pos_ref = np.array(self._historyQPositionReference)
+        q_vel = np.array(self._historyQVelocity)
+        q_vel_ref = np.array(self._historyQVelocityReference)
         control = np.array(self._historyControlAction)
 
+        # Nombres y grupos
         jointNames = [
             "left_shoulder_roll",
             "left_shoulder_pitch",
@@ -304,86 +308,141 @@ class SwayControl(threading.Thread):
             "right_elbow_roll",
             "right_elbow_pitch",
         ]
+        left_indices = range(0, 4)
+        right_indices = range(4, 8)
 
-        leftIndices = range(0, 4)  # Left Arm joints
-        rightIndices = range(4, 8)  # Right Arm joints
+        # Colores consistentes por articulación
+        color_map = plt.cm.get_cmap("tab10", len(jointNames))
+        joint_colors = {name: color_map(i) for i, name in enumerate(jointNames)}
 
         # --- 1. Gráficas individuales por articulación ---
         for i, name in enumerate(jointNames):
+            # Determinar carpeta de guardado
+            save_dir = dir_left if i in left_indices else dir_right
+
+            # Evitar gráficas vacías
+            if time.size == 0 or q_pos.shape[0] == 0:
+                print(f"⚠️ Sin datos para {name}, se omite.")
+                continue
+
             # Posición
             plt.figure()
-            plt.plot(time, qPos[:, i], label="Actual")
-            plt.plot(time, qPosRef[:, i], label="Referencia", linestyle="--")
+            plt.plot(time, q_pos[:, i], label="Actual", color=joint_colors[name])
+            plt.plot(
+                time,
+                q_pos_ref[:, i],
+                label="Referencia",
+                linestyle="--",
+                color=joint_colors[name],
+            )
             plt.xlabel("Tiempo [s]")
             plt.ylabel("Posición [rad]")
             plt.title(f"Posición articular - {name}")
             plt.legend()
             plt.grid(True)
-            plt.savefig(os.path.join(output_dir, f"pos_{name}.png"))
+            plt.savefig(os.path.join(save_dir, f"pos_{name}.png"))
             plt.close()
 
             # Velocidad
             plt.figure()
-            plt.plot(time, qVel[:, i], label="Actual")
-            plt.plot(time, qVelRef[:, i], label="Referencia", linestyle="--")
+            plt.plot(time, q_vel[:, i], label="Actual", color=joint_colors[name])
+            plt.plot(
+                time,
+                q_vel_ref[:, i],
+                label="Referencia",
+                linestyle="--",
+                color=joint_colors[name],
+            )
             plt.xlabel("Tiempo [s]")
             plt.ylabel("Velocidad [rad/s]")
             plt.title(f"Velocidad articular - {name}")
             plt.legend()
             plt.grid(True)
-            plt.savefig(os.path.join(output_dir, f"vel_{name}.png"))
+            plt.savefig(os.path.join(save_dir, f"vel_{name}.png"))
             plt.close()
 
-        # --- 2. Gráfica con todas las articulaciones por brazo (posiciones y referencias) ---
+        # --- 2. Gráfica con todas las articulaciones por brazo ---
         # Brazo izquierdo
         plt.figure()
-        for i in leftIndices:
-            plt.plot(time, qPos[:, i], label=f"{jointNames[i]} actual")
-            plt.plot(time, qPosRef[:, i], linestyle="--", label=f"{jointNames[i]} ref")
+        for i in left_indices:
+            plt.plot(
+                time,
+                q_pos[:, i],
+                label=f"{jointNames[i]} actual",
+                color=joint_colors[jointNames[i]],
+            )
+            plt.plot(
+                time,
+                q_pos_ref[:, i],
+                linestyle="--",
+                label=f"{jointNames[i]} ref",
+                color=joint_colors[jointNames[i]],
+            )
         plt.xlabel("Tiempo [s]")
         plt.ylabel("Posición [rad]")
         plt.title("Posiciones brazo izquierdo")
         plt.legend()
         plt.grid(True)
-        plt.savefig(os.path.join(output_dir, "pos_brazo_izquierdo.png"))
+        plt.savefig(os.path.join(dir_left, "pos_brazo_izquierdo.png"))
         plt.close()
 
         # Brazo derecho
         plt.figure()
-        for i in rightIndices:
-            plt.plot(time, qPos[:, i], label=f"{jointNames[i]} actual")
-            plt.plot(time, qPosRef[:, i], linestyle="--", label=f"{jointNames[i]} ref")
+        for i in right_indices:
+            plt.plot(
+                time,
+                q_pos[:, i],
+                label=f"{jointNames[i]} actual",
+                color=joint_colors[jointNames[i]],
+            )
+            plt.plot(
+                time,
+                q_pos_ref[:, i],
+                linestyle="--",
+                label=f"{jointNames[i]} ref",
+                color=joint_colors[jointNames[i]],
+            )
         plt.xlabel("Tiempo [s]")
         plt.ylabel("Posición [rad]")
         plt.title("Posiciones brazo derecho")
         plt.legend()
         plt.grid(True)
-        plt.savefig(os.path.join(output_dir, "pos_brazo_derecho.png"))
+        plt.savefig(os.path.join(dir_right, "pos_brazo_derecho.png"))
         plt.close()
 
-        # --- 3. Acciones de control por brazo ---
+        # --- 3. Acciones de control ---
         # Brazo izquierdo
         plt.figure()
-        for i in leftIndices:
-            plt.plot(time, control[:, i], label=jointNames[i])
+        for i in left_indices:
+            plt.plot(
+                time,
+                control[:, i],
+                label=jointNames[i],
+                color=joint_colors[jointNames[i]],
+            )
         plt.xlabel("Tiempo [s]")
         plt.ylabel("Torque [Nm]")
         plt.title("Acciones de control - brazo izquierdo")
         plt.legend()
         plt.grid(True)
-        plt.savefig(os.path.join(output_dir, "control_brazo_izquierdo.png"))
+        plt.savefig(os.path.join(dir_left, "control_brazo_izquierdo.png"))
         plt.close()
 
         # Brazo derecho
         plt.figure()
-        for i in rightIndices:
-            plt.plot(time, control[:, i], label=jointNames[i])
+        for i in right_indices:
+            plt.plot(
+                time,
+                control[:, i],
+                label=jointNames[i],
+                color=joint_colors[jointNames[i]],
+            )
         plt.xlabel("Tiempo [s]")
         plt.ylabel("Torque [Nm]")
         plt.title("Acciones de control - brazo derecho")
         plt.legend()
         plt.grid(True)
-        plt.savefig(os.path.join(output_dir, "control_brazo_derecho.png"))
+        plt.savefig(os.path.join(dir_right, "control_brazo_derecho.png"))
         plt.close()
 
-        print(f"✅ Gráficas guardadas en: {os.path.abspath(output_dir)}")
+        print(f"✅ Gráficas guardadas en:\n  {dir_left}\n  {dir_right}")
