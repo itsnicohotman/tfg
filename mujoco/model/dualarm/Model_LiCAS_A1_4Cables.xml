@@ -117,6 +117,12 @@
     <motor name="right_elbow_roll" joint="q23" gear="10" ctrlrange="-1 1" ctrllimited="true"/>
     <motor name="right_elbow_pitch" joint="q24" gear="10" ctrlrange="-1 1" ctrllimited="true"/>
   </actuator>
+
+  <sensor>
+    <accelerometer name="robot_linacc" site="LiCAS_base_center" />
+    <gyro name="robot_gyro" site="LiCAS_base_center" />
+    <velocimeter name="robot_vel" site="LiCAS_base_center" />
+  </sensor>
 </mujoco>
 
 

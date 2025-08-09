@@ -95,6 +95,8 @@ class MujocoSimulation(threading.Thread):
 
     def run(self):
         print("[MujocoSimulation] Initialized.")
+        time.sleep(1)
+
         real_start = time.time()
         with self._dataLock:
             sim_start = np.copy(self._data.time)
@@ -123,7 +125,6 @@ class MujocoSimulation(threading.Thread):
         timestep = self._model.opt.timestep
         nextTime = time.perf_counter()
 
-        time.sleep(1)
         while not self._shutdownEvent.is_set():
             tStart = time.perf_counter()
             timeDebug = self._timeDebugging and iteration % 200 == 0
@@ -147,6 +148,9 @@ class MujocoSimulation(threading.Thread):
                 ) = self._fastReader.read(self._data, droneID, manipulatorID)
                 sensorData = np.copy(self._data.sensordata)
 
+            if timeDebug:
+                t0_1 = time.time()
+
             if iteration == 1:
                 print(
                     f"[MujocoSimulation] Initial Manipulator position: {manipulatorGlobalPosition}, Initial Drone position: {droneGlobalPosition}"
@@ -156,6 +160,9 @@ class MujocoSimulation(threading.Thread):
                 sensorData, self._sensorInfo
             )
 
+            if timeDebug:
+                t0_2 = time.time()
+
             manipulatorGlobalPosition = [0, 0, 0]
             sensorDataMessage = SensorData(
                 timestamp=currentTimestamp,
@@ -163,6 +170,9 @@ class MujocoSimulation(threading.Thread):
                 sensorValues=droneSensorValues,
                 dronePosition=droneGlobalPosition,
             )
+
+            if timeDebug:
+                t0_3 = time.time()
 
             robotSensorDataMessage = RobotSensorData(
                 timestamp=currentTimestamp,
@@ -174,17 +184,20 @@ class MujocoSimulation(threading.Thread):
                 jointsVelocity=qvel,
             )
 
+            if timeDebug:
+                t0_4 = time.time()
+
             self._droneController.setSensorData(sensorDataMessage)
             self._swayController.setSensorData(robotSensorDataMessage)
             if debug:
                 print(f"[MujocoSimulation] sensorDataMessage: {sensorDataMessage}")
 
-            ###########################################################
-            # --- Get control output from DroneControl thread ---
-            ###########################################################
             if timeDebug:
                 t1 = time.time()
 
+            ###########################################################
+            # --- Get control output from DroneControl thread ---
+            ###########################################################
             controlAction: ControlAction = self._droneController.getControlInputs()
             robotControlAction: RobotControlAction = (
                 self._swayController.getControlInputs()
@@ -235,8 +248,12 @@ class MujocoSimulation(threading.Thread):
                 elapsedStep = t3 - t2
                 elapsedTotal = t3 - t0
                 print(
-                    f"[MujcoSimulation] Step: {elapsedStep:.6f}, recv control: {elapsedRecvControl:.6f}, send sensors: {elapsedSendData:.6f}, TOTAL: {elapsedTotal}"
+                    f"[MujcoSimulation] Step: {elapsedStep:.6f}, recv control: {elapsedRecvControl:.6f}, send sensors: {elapsedSendData:.6f}"
                 )
+                print(
+                    f"[MujocoSimulation] extract data: {(t0_1-t0):.6f}. extract sensors: {(t0_2-t0_1):.6f}, DroneSensorData: {(t0_3-t0_2):.6f}, RobotSensorData: {(t0_4-t0_3):.6f}, Set sensor messages: {(t1-t0_4):.6f}"
+                )
+                print(f"[MujocoSimulation]  TOTAL: {elapsedTotal:.6f}")
 
             if sleepDuration > 0.0001:
                 time.sleep(sleepDuration - 0.00005)  # Sleeps most of the time

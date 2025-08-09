@@ -28,11 +28,11 @@ class SwayControl(threading.Thread):
 
         # Joint Position -> Joint Velocity PID Controller
         pKp = np.array(
-            [1, 0, 0, 0, 1, 0, 0, 0], dtype=np.float64
+            [1, 1, 12, 12, 1, 1, 12, 12], dtype=np.float64
         )  # Kp for Joints [q11 q12 q13 q14 q21 q22 q23 q24]
-        pKi = np.zeros(8, dtype=np.float64)  # Ki for Joints [0 0 0 0 0 0 0 0]
-        pKd = np.zeros(8, dtype=np.float64)  # Kd for Joints [0 0 0 0 0 0 0 0]
-        self._MAX_VEL = 3  # Maximum joint velocity
+        pKi = np.array([0, 0, 5, 5, 0, 0, 5, 5])  # Ki for Joints [0 0 0 0 0 0 0 0]
+        pKd = np.array([0, 0, 0, 0, 0, 0, 0, 0])  # Kd for Joints [0 0 0 0 0 0 0 0]
+        self._MAX_VEL = 1  # Maximum joint velocity
         self._positionPID = PIDController(
             kp=pKp,
             ki=pKi,
@@ -41,9 +41,9 @@ class SwayControl(threading.Thread):
         )
 
         # Joint Velocity -> Joint Torque PID Controller - 5 times faster than position PID
-        vKp = np.array([1, 0, 0, 0, 1, 0, 0, 0], dtype=np.float64)
-        vKi = np.array([1, 0, 0, 0, 1, 0, 0, 0], dtype=np.float64)
-        vKd = np.array([0, 0, 0, 0, 0, 0, 0, 0], dtype=np.float64)
+        vKp = np.array([1, 1, 10, 10, 1, 1, 10, 10], dtype=np.float64)
+        vKi = np.array([1, 1, 5, 5, 1, 1, 5, 5], dtype=np.float64)
+        vKd = np.array([0, 0, 0, 0.01, 0, 0, 0, 0], dtype=np.float64)
         self._MAX_TORQUE = 1.0  # Maximum torque for the motors
         self._velocityPID = PIDController(
             kp=vKp,
@@ -52,6 +52,13 @@ class SwayControl(threading.Thread):
             outputLimit=self._MAX_TORQUE,
         )
 
+        # Inputs
+        self._sensorData: RobotSensorData = None
+
+        # Outputs
+        self._robotControlAction: RobotControlAction = RobotControlAction(
+            jointMotors={}  # Dictionary with manipulator's control values: key=motor name, value=action value
+        )
         # To check if the references have been reached.
         self._lastCheckTime = None
         self._reachedReferences = False
@@ -87,8 +94,7 @@ class SwayControl(threading.Thread):
         self._historyQVelocityReference = []
 
         self._debugging = False
-        self._debug = False
-        self._timeDebugging = True
+        self._timeDebugging = False
 
     def run(self):
         print("[SwayControl] Initialized.")
@@ -110,34 +116,31 @@ class SwayControl(threading.Thread):
             timeDebug = self._timeDebugging and iteration % 200 == 0
             self.updateCurrentState()
 
-            # if self._timeDebugging:
-            #     print(
-            #         f"[SwayControl] Time since start: {time.time() - tStart:.2f} seconds"
-            #     )
-            #     print(
-            #         f"[SwayControl] current timestamp: {self._currentTimestamp}, previous timestamp: {self._previousTimestamp}"
-            # )
-            # print(f"[SwayControl] posDt: {posDt}, velDt: {velDt}")
-
             # For first testing, change references every 5 seconds
-            tnow = time.time()
-            if tnow > 5:
-                self._targetQPosition = np.array(
-                    [1.57, 0.0, 0.0, 0.0, -1.57, 0.0, 0.0, 0.0]
-                )
+            tSinceStart = time.time() - tStart
+            if tSinceStart > 5:
+                self._targetQPosition = np.array([0, 0.0, 1.0, 0, 0, 0.0, -1.0, 0])
 
-            if tnow > 10:
+            if tSinceStart > 10:
                 self._targetQPosition = np.array(
                     [1.57, 0.75, 0.0, 0.0, -1.57, -0.75, 0.0, 0.0]
                 )
 
-            if tnow > 15:
+            if tSinceStart > 15:
                 self._targetQPosition = np.array(
-                    [1.57, 0.75, 0.0, 0.4, -1.57, -0.75, 0.0, 0.4]
+                    [1.57, 0.75, 0.0, 0.4, -1.57, -0.75, 0.0, -0.4]
+                )
+
+            if tSinceStart > 20:
+                self._targetQPosition = np.array(
+                    [1.57, 0.75, 1.0, 0.4, -1.57, -0.75, -1.0, -0.4]
+                )
+            if tSinceStart > 25:
+                self._targetQPosition = np.array(
+                    [1.57, -0.75, 1.0, -0.4, -1.57, 0.75, -1.0, 0.4]
                 )
 
             iteration += 1
-            # self._debug = self._debugging and iteration % 300 == 0
 
             t1 = time.time()
 
@@ -196,34 +199,35 @@ class SwayControl(threading.Thread):
             sleepDuration = nextTime - time.perf_counter()
 
             if timeDebug:
-                real_elapsed = time.time() - real_start
-                sim_elapsed = self._currentTimestamp - sim_start
-
                 print(
                     f"[SwayControl] Elapsed Cycle: {elapsedCycle}, Sleep Duration; {sleepDuration}."
                 )
-                print(
-                    f"[SwayControl] Sim Time: {sim_elapsed:.2f} s, Real Time: {real_elapsed:.2f} s"
-                )
-                elapsedCalcControl = t2 - t1
-                elapsedSetReference = t1 - tnow
-                elapsedUpdateState = t1 - t0
-                elapsedSetMotorsDict = t3 - t2
-                elapsedTotal = t3 - t0
-                print(
-                    f"[SwayControl]  Update: {elapsedUpdateState}, Set ref.: {elapsedSetReference:.6f}, \n Calculate Control: {elapsedCalcControl:.6f}, send Motors: {elapsedSetMotorsDict:.6f}, \n TOTAL: {elapsedTotal}"
-                )
+                print(f"[SwayControl] posDt: {posDt}, velDt: {velDt}")
+                # real_elapsed = time.time() - real_start
+                # sim_elapsed = self._currentTimestamp - sim_start
+                # print(
+                #     f"[SwayControl] Sim Time: {sim_elapsed:.2f} s, Real Time: {real_elapsed:.2f} s"
+                # )
+                # elapsedCalcControl = t2 - t1
+                # elapsedSetReference = t1 - tnow
+                # elapsedUpdateState = t1 - t0
+                # elapsedSetMotorsDict = t3 - t2
+                # elapsedTotal = t3 - t0
+                # print(
+                #     f"[SwayControl]  Update: {elapsedUpdateState}, Set ref.: {elapsedSetReference:.6f}, \n Calculate Control: {elapsedCalcControl:.6f}, send Motors: {elapsedSetMotorsDict:.6f}, \n TOTAL: {elapsedTotal}"
+                # )
+                # print(
+                #     f"[SwayControl] Time since start: {time.time() - tStart:.2f} seconds"
+                # )
+                # print(
+                #     f"[SwayControl] current timestamp: {self._currentTimestamp}, previous timestamp: {self._previousTimestamp}"
+                # )
 
             if sleepDuration > 0:
                 time.sleep(sleepDuration)
             else:
                 # Si el procesamiento tarda más de 1 ms, ajusta el siguiente ciclo
                 nextTime = time.perf_counter()
-
-            # if self._timeDebugging:
-            #     dtReal = time.time() - t0
-            #     dtSim = self._currentTimestamp - self._previousTimestamp
-            #     print(f"[SwayControl] dtSim: {dtSim}, dtReal: {dtReal}")
 
         self.graphResults()
         print("[SwayControl] Shutting down.")
