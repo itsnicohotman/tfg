@@ -186,7 +186,12 @@ class MujocoSimulation(threading.Thread):
                 t1 = time.time()
 
             controlAction: ControlAction = self._droneController.getControlInputs()
-            allControlActions = {**controlAction.droneThrusters}
+            robotControlAction: RobotControlAction = (
+                self._swayController.getControlInputs()
+            )
+            # allControlActions = {**controlAction.droneThrusters}
+            allControlActions = dict(controlAction.droneThrusters)
+            allControlActions.update(robotControlAction.jointMotors)
 
             with self._dataLock:
                 apply_control_inputs(
