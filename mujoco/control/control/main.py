@@ -22,8 +22,13 @@ def main():
 
     if len(sys.argv) > 1:
         model = sys.argv[1]
+        if len(sys.argv) > 2:
+            swayControllerEnabled = sys.argv[2].lower() in ["true", "1", "yes"]
+        else:
+            swayControllerEnabled = False
     else:
         model = "drone"
+        swayControllerEnabled = False
         print("The used model by default will be 'drone'.")
 
     shutdownEvent = threading.Event()
@@ -53,6 +58,7 @@ def main():
         model,
         droneController,
         swayController=swayController,
+        swayControllerEnabled=swayControllerEnabled,
     )
     mujocoSim.start()
     droneController.start()

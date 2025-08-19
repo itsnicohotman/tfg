@@ -28,10 +28,12 @@ class MujocoSimulation(threading.Thread):
         model,
         droneController: DroneControl,
         swayController: SwayControl,
+        swayControllerEnabled: bool,
     ):
         super().__init__()  # Start thread
         self._droneController = droneController
         self._swayController = swayController
+        self._swayControllerEnabled = swayControllerEnabled
         match model:
             case "drone":
                 MODEL_PATH = "/home/nicolas/tfg/mujoco/model/drone/Model_GRVC_Drone.xml"
@@ -174,21 +176,23 @@ class MujocoSimulation(threading.Thread):
             if timeDebug:
                 t0_3 = time.time()
 
-            robotSensorDataMessage = RobotSensorData(
-                timestamp=currentTimestamp,
-                timestep=self._model.opt.timestep,
-                sensorValues=robotSensorValues,
-                manipulatorPosition=manipulatorGlobalPosition,
-                dronePosition=droneGlobalPosition,
-                jointsPosition=qpos,
-                jointsVelocity=qvel,
-            )
+            if self._swayControllerEnabled:
+                robotSensorDataMessage = RobotSensorData(
+                    timestamp=currentTimestamp,
+                    timestep=self._model.opt.timestep,
+                    sensorValues=robotSensorValues,
+                    manipulatorPosition=manipulatorGlobalPosition,
+                    dronePosition=droneGlobalPosition,
+                    jointsPosition=qpos,
+                    jointsVelocity=qvel,
+                )
 
             if timeDebug:
                 t0_4 = time.time()
 
             self._droneController.setSensorData(sensorDataMessage)
-            self._swayController.setSensorData(robotSensorDataMessage)
+            if self._swayControllerEnabled:
+                self._swayController.setSensorData(robotSensorDataMessage)
             if debug:
                 print(f"[MujocoSimulation] sensorDataMessage: {sensorDataMessage}")
 
@@ -199,12 +203,13 @@ class MujocoSimulation(threading.Thread):
             # --- Get control output from DroneControl thread ---
             ###########################################################
             controlAction: ControlAction = self._droneController.getControlInputs()
-            robotControlAction: RobotControlAction = (
-                self._swayController.getControlInputs()
-            )
             # allControlActions = {**controlAction.droneThrusters}
             allControlActions = dict(controlAction.droneThrusters)
-            allControlActions.update(robotControlAction.jointMotors)
+            if self._swayControllerEnabled:
+                robotControlAction: RobotControlAction = (
+                    self._swayController.getControlInputs()
+                )
+                allControlActions.update(robotControlAction.jointMotors)
 
             with self._dataLock:
                 apply_control_inputs(
