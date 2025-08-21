@@ -31,9 +31,9 @@
     <!-- Create the robotic arm following a tree structure from the base link -->
     <body name="LiCAS_A1" pos="0 0 1.3755">
       <freejoint/>
-      <site name="drone_cable_hook_center" pos="0 0 0.05" group="2" rgba="0 1 0 1" euler="0 1.57 0"/>
-      <site name="drone_cable_hook_left" pos="0 0.06 0.04" group="2" rgba="0 1 0 1" euler="0 1.57 0"/>
-      <site name="drone_cable_hook_right" pos="0 -0.06 0.04" group="2" rgba="0 1 0 1" euler="0 1.57 0"/>
+      <site name="arms_side_center" pos="0 0 0.05" group="2" rgba="0 1 0 1" euler="0 1.57 0"/>
+      <site name="arms_side_left" pos="0 0.06 0.04" group="2" rgba="0 0 1 1" euler="0 1.57 0"/>
+      <site name="arms_side_right" pos="0 -0.06 0.04" group="2" rgba="1 0 0 1" euler="0 1.57 0"/>
       <!-- Create the geometry and set the physical properties of the manipulator base -->
       <geom name="Shoulder_Pitch_Structure_geom" type="mesh" mesh="Shoulder_Pitch_Structure_mesh" rgba="0.6 0.8 0.8 1"/>
       <inertial pos="0 0 -1.2e-2" mass="0.639" fullinertia="3.02e-3 8.64e-4 3.39e-3 0 0 0"/>

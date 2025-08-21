@@ -34,10 +34,12 @@
       <site name="X axis" type="cylinder" size="0.025 0.1" euler="0 1.57 0" pos="0.15 0 0" rgba="1 0 0 1"/>
       <site name="Y axis" type="cylinder" size="0.025 0.1" euler="1.57 0 0" pos="0 0.15 0" rgba="0 1 0 1"/>
       <site name="Z axis" type="cylinder" size="0.025 0.1" pos="0 0 0.15" rgba="0 0 1 1"/>
+      <site name="drone_side_center" pos="0 0 -0.07" rgba="0 0 1 1" group="2"/>
       <freejoint/>
       <inertial pos="0 0 0" mass="4.65" fullinertia="0.3045 0.2156 0.3945 1.5e-6 1e-15 1.38e-5"/>
 
       <!-- Cable that joins manipulator and drone. -->
+      <site name="drone_side" pos="0 0 -0.07" size="0.02" rgba="0 0 1 1" group="2"/>
       <composite type="cable" prefix="cable_" curve="s" count="10 1 1" size="0.5" offset="0 0 -0.07" quat="0 -0.7071 0 0.7071" initial="ball">
         <plugin plugin="mujoco.elasticity.cable">
           <config key="twist" value="1e7" />
@@ -95,7 +97,7 @@
   <include file="../dualarm/Model_LiCAS_A1.xml"/>
  
   <equality>
-    <weld name="cable_robot_body" site1="cable_S_last" site2="drone_cable_hook_center" solref="0.005 1"
+    <weld name="cable_robot_body" site1="cable_S_last" site2="arms_side_center" solref="0.005 1"
       solimp="0.9 0.95 0.001 0.001 0.001"/>
   </equality>
   <contact>
