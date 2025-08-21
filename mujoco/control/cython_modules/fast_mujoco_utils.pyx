@@ -17,7 +17,9 @@ def extract_data(np.ndarray[DTYPE_t, ndim=2] xpos,           # (num_bodies, 3)
                  np.ndarray[DTYPE_t, ndim=1] qvel,           # (num_joints, 1)
                  np.ndarray[ITYPE_t, ndim=2] joint_indices,  # (nj,)
                  np.ndarray[ITYPE_t, ndim=2] velocity_indices, # (nv,)
-                 double current_time,):
+                 double current_time,
+                 np.ndarray[ITYPE_t, ndim=1] drone_hook_ids=None,
+                 np.ndarray[ITYPE_t, ndim=1] arms_hook_ids=None):
     """
     Extrae datos optimizados desde arrays ya separados de MuJoCo.
     """
@@ -42,9 +44,15 @@ def extract_data(np.ndarray[DTYPE_t, ndim=2] xpos,           # (num_bodies, 3)
     for i in range(nv):
         qvel_sel[i] = qvel[velocity_indices[i]]
 
+    # --- Extraer hook positions ---
+    cdef np.ndarray[DTYPE_t, ndim=2] drone_hooks = xpos[drone_hook_ids, :]
+    cdef np.ndarray[DTYPE_t, ndim=2] arms_hooks  = xpos[arms_hook_ids, :]
+
     # Devolver datos como arrays independientes
     return (np.array(drone_pos, copy=True),
             np.array(manip_pos, copy=True),
             qpos_sel,
             qvel_sel,
-            current_time)
+            current_time,
+            drone_hooks,
+            arms_hooks)

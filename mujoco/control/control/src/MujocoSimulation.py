@@ -75,6 +75,63 @@ class MujocoSimulation(threading.Thread):
             self._model.actuator(i).name: i for i in range(self._model.nu)
         }
 
+        hookNamesByModel = {
+            "1 cable": [
+                "drone_side_center",
+                "arms_side_center",
+            ],
+            "2 cable": [
+                "drone_side_right",
+                "drone_side_left",
+                "arms_side_right",
+                "arms_side_left",
+            ],
+            "4 cable": [
+                "drone_side_right",
+                "drone_side_left",
+                "drone_side_back",
+                "drone_side_front",
+                "arms_side_right",
+                "arms_side_left",
+                "arms_side_back",
+                "arms_side_front",
+            ],
+        }
+        self._armsHooks = []
+        self._droneHooks = []
+        self._hookSiteNamesIDs = {}
+        if model in hookNamesByModel:
+            for name in hookNamesByModel[model]:
+                sid = mujoco.mj_name2id(self._model, mujoco.mjtObj.mjOBJ_SITE, name)
+                if sid == -1:
+                    raise RuntimeError(f"Site {name} not found in model.")
+                self._hookSiteNamesIDs[name] = sid
+        self._hookSiteNames = list(self._hookSiteNamesIDs.keys())
+        self._hookSiteIds = np.array(
+            list(self._hookSiteNamesIDs.values()), dtype=np.int32
+        )
+        hook_pairs = [
+            ("drone_side_center", "arms_side_center"),
+            ("drone_side_right", "arms_side_right"),
+            ("drone_side_left", "arms_side_left"),
+            ("drone_side_back", "arms_side_back"),
+            ("drone_side_front", "arms_side_front"),
+        ]
+
+        self._droneHookIds = []
+        self._armsHookIds = []
+
+        for drone_name, arm_name in hook_pairs:
+            if (
+                drone_name in self._hookSiteNamesIDs
+                and arm_name in self._hookSiteNamesIDs
+            ):
+                self._droneHookIds.append(self._hookSiteNamesIDs[drone_name])
+                self._armsHookIds.append(self._hookSiteNamesIDs[arm_name])
+
+        self._droneHookIds = np.array(self._droneHookIds, dtype=np.int32)
+        self._armsHookIds = np.array(self._armsHookIds, dtype=np.int32)
+
         self._licasJoints = ["q11", "q12", "q13", "q14", "q21", "q22", "q23", "q24"]
         self._jointIndices = [
             self._model.joint(name).qposadr for name in self._licasJoints
@@ -82,7 +139,12 @@ class MujocoSimulation(threading.Thread):
         self._velocityIndices = [
             self._model.joint(name).dofadr for name in self._licasJoints
         ]
-        self._fastReader = FastSensorReader(self._jointIndices, self._velocityIndices)
+        self._fastReader = FastSensorReader(
+            self._jointIndices,
+            self._velocityIndices,
+            self._droneHookIds,
+            self._armsHookIds,
+        )
 
         self._sensorInfo = []
         for i in range(self._model.nsensor):
@@ -147,6 +209,8 @@ class MujocoSimulation(threading.Thread):
                     qpos,
                     qvel,
                     currentTimestamp,
+                    self._droneHooks,
+                    self._armsHooks,
                 ) = self._fastReader.read(self._data, droneID, manipulatorID)
                 sensorData = np.copy(self._data.sensordata)
 
@@ -185,6 +249,9 @@ class MujocoSimulation(threading.Thread):
                     dronePosition=droneGlobalPosition,
                     jointsPosition=qpos,
                     jointsVelocity=qvel,
+                    droneAcceleration=droneSensorValues["body_linacc"],
+                    armsHooks=self._armsHooks,
+                    droneHooks=self._droneHooks,
                 )
 
             if timeDebug:
@@ -282,6 +349,13 @@ class MujocoSimulation(threading.Thread):
         if self._viewerThread:
             self._viewerThread.join()
 
+    def getHookSitesPositions(self):
+        """Returns a dictionary {siteName: globalPosition} for all hook sites."""
+        return {
+            name: np.copy(self._data.site_xpos[sid])
+            for name, sid in self._hookSiteNamesIDs.items()
+        }
+
     def setViewersCamera(self, droneID):
         self._viewer.cam.type = mujoco.mjtCamera.mjCAMERA_TRACKING
         self._viewer.cam.trackbodyid = droneID
@@ -341,9 +415,11 @@ if __name__ == "__main__":
 
 
 class FastSensorReader:
-    def __init__(self, jointIndices, velocityIndices):
+    def __init__(self, jointIndices, velocityIndices, droneHookIds, armsHookIds):
         self.jointIndices = np.array(jointIndices, dtype=np.int32)
         self.velocityIndices = np.array(velocityIndices, dtype=np.int32)
+        self._droneHookIds = droneHookIds
+        self._armsHookIds = armsHookIds
 
     def read(self, data, droneId, manipulatorId):
 
@@ -356,4 +432,6 @@ class FastSensorReader:
             self.jointIndices,
             self.velocityIndices,
             data.time,
+            self._droneHookIds,
+            self._armsHookIds,
         )

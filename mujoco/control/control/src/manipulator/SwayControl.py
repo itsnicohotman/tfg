@@ -54,6 +54,8 @@ class SwayControl(threading.Thread):
 
         # Inputs
         self._sensorData: RobotSensorData = None
+        self._currentArmsHookPositions = None
+        self._currentDroneHookPositions = None
 
         # Outputs
         self._robotControlAction: RobotControlAction = RobotControlAction(
@@ -73,6 +75,10 @@ class SwayControl(threading.Thread):
         self._currentAngularVelocity = np.zeros(3)
         self._currentVelocity = np.zeros(3)
         self._currentTargetPosition = np.zeros(3)
+        self._currentDroneAcceleration = np.zeros(3)
+        self._currentCableVectorAvg = np.zeros(3)
+        self._prevThetas = (0.0, 0.0)
+        self._prevDt = 0.0
 
         self._targetQPosition = np.zeros(8)  # Target joint positions
         self._qPosition = np.zeros(8)  # Current joint positions
@@ -104,8 +110,10 @@ class SwayControl(threading.Thread):
 
         previousPosTimestamp = 0.0
         previousVelTimestamp = 0.0
+        previousQRefTimestamp = 0.0
         PERIOD_POS_CONTR = 0.005
         PERIOD_VEL_CONTR = 0.001
+        PERIOD_QREF_CONTR = 0.02
         posDt = 0
         velDt = 0
 
@@ -115,32 +123,25 @@ class SwayControl(threading.Thread):
             t0 = time.time()
             timeDebug = self._timeDebugging and iteration % 200 == 0
             self.updateCurrentState()
-
+            iteration += 1
             # For first testing, change references every 5 seconds
             tSinceStart = time.time() - tStart
-            if tSinceStart > 5:
-                self._targetQPosition = np.array([0, 0.0, 1.0, 0, 0, 0.0, -1.0, 0])
 
-            if tSinceStart > 10:
-                self._targetQPosition = np.array(
-                    [1.57, 0.75, 0.0, 0.0, -1.57, -0.75, 0.0, 0.0]
+            ###############################
+            # Calculate Shoulder pitch and roll references
+            ###############################
+            if iteration == 1 or iteration % 50 == 0:
+                self._prevDt = self._currentTimestamp - previousQRefTimestamp
+                if self._prevDt <= 0:
+                    self._prevDt = PERIOD_QREF_CONTR
+                qsp_ref, qsr_ref = self.computeShoulderReferences()
+                print(
+                    f"[SwayControl] Shoulder references: qsp_ref={qsp_ref:.3f}, qsr_ref={qsr_ref:.3f}"
                 )
-
-            if tSinceStart > 15:
-                self._targetQPosition = np.array(
-                    [1.57, 0.75, 0.0, 0.4, -1.57, -0.75, 0.0, -0.4]
-                )
-
-            if tSinceStart > 20:
-                self._targetQPosition = np.array(
-                    [1.57, 0.75, 1.0, 0.4, -1.57, -0.75, -1.0, -0.4]
-                )
-            if tSinceStart > 25:
-                self._targetQPosition = np.array(
-                    [1.57, -0.75, 1.0, -0.4, -1.57, 0.75, -1.0, 0.4]
-                )
-
-            iteration += 1
+                self._targetQPosition[1] = qsp_ref  # left_shoulder_pitch
+                self._targetQPosition[0] = qsr_ref  # left_shoulder_roll
+                self._targetQPosition[5] = qsp_ref  # right_shoulder_pitch
+                self._targetQPosition[4] = qsr_ref  # right_shoulder_roll
 
             t1 = time.time()
 
@@ -260,6 +261,9 @@ class SwayControl(threading.Thread):
             )
             self._qPosition = sensorData.jointsPosition
             self._qVelocity = sensorData.jointsVelocity
+            self._currentDroneAcceleration = sensorData.droneAcceleration
+            self._currentArmsHookPositions = sensorData.armsHooks
+            self._currentDroneHookPositions = sensorData.droneHooks
             if self._currentTargetPosition[0] is None:
                 self._currentTargetPosition[0] = self._currentPosition[0]
             if self._currentTargetPosition[1] is None:
@@ -268,6 +272,64 @@ class SwayControl(threading.Thread):
                 self._currentTargetPosition[2] = self._currentPosition[2]
         else:
             pass
+
+    def computeShoulderReferences(self):
+        """
+        Calculates shoulder pitch (qsp) and roll (qsr) references from the drone's acceleration and cable vector.
+        """
+
+        Kp = 0.6
+        Kd = 0.3
+
+        g = 9.81
+        ax, ay = self._currentDroneAcceleration[0], self._currentDroneAcceleration[1]
+
+        # feedforward: compensar aceleración del dron
+        pitchFF = -np.arctan2(ax, g)
+        rollFF = -np.arctan2(ay, g)
+
+        # ángulos de la cuerda respecto a z
+        unitVectors, self._currentCableVectorAvg = self.computeCableVectors(
+            armsHooks=self._currentArmsHookPositions,
+            droneHooks=self._currentDroneHookPositions,
+        )
+        u = self._currentCableVectorAvg / (np.linalg.norm(self._currentCableVectorAvg))
+        thetaX = np.arctan2(u[0], u[2])  # inclinación en x
+        thetaY = np.arctan2(u[1], u[2])  # inclinación en y
+
+        # derivadas (aprox)
+        dthetaX = (thetaX - self._prevThetas[0]) / (self._prevDt)
+        dthetaY = (thetaY - self._prevThetas[1]) / (self._prevDt)
+
+        self._prevThetas = (thetaX, thetaY)
+
+        # control feedback: PD sobre ángulo de la cuerda
+        qsp_ref = pitchFF - Kp * thetaX - Kd * dthetaX
+        qsr_ref = rollFF - Kp * thetaY - Kd * dthetaY
+
+        return qsp_ref, qsr_ref
+
+    def computeCableVectors(self, armsHooks, droneHooks):
+        """
+        Calcula vectores unitarios de las cuerdas en coordenadas globales.
+        armsHooks: np.array shape (N,3)
+        droneHooks: np.array shape (N,3)
+        return:
+        unit_vectors: np.array shape (N,3) con los vectores normalizados
+        u_avg: np.array shape (3,) vector unitario promedio
+        """
+        diffs = armsHooks - droneHooks
+        norms = np.linalg.norm(diffs, axis=1, keepdims=True)
+        unitVectors = diffs / norms
+
+        # promedio y normalización
+        uMean = np.mean(unitVectors, axis=0)
+        uAvg = uMean / np.linalg.norm(uMean)
+
+        # print("[SwayControl] Unit Vectors:", unitVectors)
+        # print("[SwayControl] Average Unit Vector:", uAvg)
+
+        return unitVectors, uAvg
 
     # Accessed from MujocoSimulation thread.
     def setSensorData(self, sensorData: RobotSensorData):
