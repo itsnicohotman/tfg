@@ -135,9 +135,9 @@ class SwayControl(threading.Thread):
                 if self._prevDt <= 0:
                     self._prevDt = PERIOD_QREF_CONTR
                 qsp_ref, qsr_ref = self.computeShoulderReferences()
-                print(
-                    f"[SwayControl] Shoulder references: qsp_ref={qsp_ref:.3f}, qsr_ref={qsr_ref:.3f}"
-                )
+                # print(
+                #     f"[SwayControl] Shoulder references: qsp_ref={qsp_ref:.3f}, qsr_ref={qsr_ref:.3f}"
+                # )
                 self._targetQPosition[1] = qsp_ref  # left_shoulder_pitch
                 self._targetQPosition[0] = qsr_ref  # left_shoulder_roll
                 self._targetQPosition[5] = qsp_ref  # right_shoulder_pitch

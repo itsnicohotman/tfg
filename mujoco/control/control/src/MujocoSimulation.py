@@ -97,8 +97,7 @@ class MujocoSimulation(threading.Thread):
                 "arms_side_front",
             ],
         }
-        self._armsHooks = []
-        self._droneHooks = []
+
         self._hookSiteNamesIDs = {}
         if model in hookNamesByModel:
             for name in hookNamesByModel[model]:
@@ -132,13 +131,20 @@ class MujocoSimulation(threading.Thread):
         self._droneHookIds = np.array(self._droneHookIds, dtype=np.int32)
         self._armsHookIds = np.array(self._armsHookIds, dtype=np.int32)
 
+        self._droneHooks = np.zeros(
+            (len(self._droneHookIds), 3), dtype=np.float64
+        )  # (nd,3)
+        self._armsHooks = np.zeros(
+            (len(self._armsHookIds), 3), dtype=np.float64
+        )  # (na,3)
+
         self._licasJoints = ["q11", "q12", "q13", "q14", "q21", "q22", "q23", "q24"]
-        self._jointIndices = [
-            self._model.joint(name).qposadr for name in self._licasJoints
-        ]
-        self._velocityIndices = [
-            self._model.joint(name).dofadr for name in self._licasJoints
-        ]
+        self._jointIndices = np.array(
+            [self._model.joint(name).qposadr for name in self._licasJoints]
+        )
+        self._velocityIndices = np.array(
+            [self._model.joint(name).dofadr for name in self._licasJoints]
+        )
         self._fastReader = FastSensorReader(
             self._jointIndices,
             self._velocityIndices,
@@ -154,7 +160,7 @@ class MujocoSimulation(threading.Thread):
 
         self._dataLock = threading.Lock()
 
-        self._timeDebugging = False
+        self._timeDebugging = True
         self._debugging = False
 
     def run(self):
@@ -185,6 +191,10 @@ class MujocoSimulation(threading.Thread):
         if len(actuadoresConIDMenosUno) > 0:
             print(f"[ERROR] Actuadores con ID -1: {actuadoresConIDMenosUno}")
 
+        droneGlobalPosition = np.zeros(3, dtype=np.float64)  # (3,)
+        manipulatorGlobalPosition = np.zeros(3, dtype=np.float64)  # (3,)
+        qpos = np.zeros(len(self._jointIndices), dtype=np.float64)  # (nj,)
+        qvel = np.zeros(len(self._velocityIndices), dtype=np.float64)  # (nv,)
         iteration = 0
         timestep = self._model.opt.timestep
         nextTime = time.perf_counter()
@@ -203,15 +213,33 @@ class MujocoSimulation(threading.Thread):
             # --- Get sensor data and send to DroneControl thread ---
             ###########################################################
             with self._dataLock:
-                (
+                # (
+                #     droneGlobalPosition,
+                #     manipulatorGlobalPosition,
+                #     qpos,
+                #     qvel,
+                #     currentTimestamp,
+                #     self._droneHooks,
+                #     self._armsHooks,
+                # ) = self._fastReader.read(self._data, droneID, manipulatorID)
+                currentTimestamp = self._data.time
+                extract_data(
+                    self._data.xpos,
+                    droneID,
+                    manipulatorID,
+                    self._data.qpos,
+                    self._data.qvel,
+                    self._jointIndices,
+                    self._velocityIndices,
+                    self._droneHookIds,
+                    self._armsHookIds,
                     droneGlobalPosition,
                     manipulatorGlobalPosition,
                     qpos,
                     qvel,
-                    currentTimestamp,
                     self._droneHooks,
                     self._armsHooks,
-                ) = self._fastReader.read(self._data, droneID, manipulatorID)
+                )
                 sensorData = np.copy(self._data.sensordata)
 
             if timeDebug:
@@ -229,7 +257,6 @@ class MujocoSimulation(threading.Thread):
             if timeDebug:
                 t0_2 = time.time()
 
-            manipulatorGlobalPosition = [0, 0, 0]
             sensorDataMessage = SensorData(
                 timestamp=currentTimestamp,
                 timestep=self._model.opt.timestep,
@@ -253,6 +280,7 @@ class MujocoSimulation(threading.Thread):
                     armsHooks=self._armsHooks,
                     droneHooks=self._droneHooks,
                 )
+                # COMPROBAR REAL TIME EN SIMULACION
 
             if timeDebug:
                 t0_4 = time.time()
@@ -278,6 +306,8 @@ class MujocoSimulation(threading.Thread):
                 )
                 allControlActions.update(robotControlAction.jointMotors)
 
+            if timeDebug:
+                t1_1 = time.time()
             with self._dataLock:
                 apply_control_inputs(
                     self._data.ctrl, self._actuatorsIDs, allControlActions
@@ -315,15 +345,16 @@ class MujocoSimulation(threading.Thread):
                 print(
                     f"[MujocoSimulation] Sim Time: {sim_elapsed:.2f} s, Real Time: {real_elapsed:.2f} s"
                 )
-                elapsedRecvControl = t2 - t1
+                elapsedApplyControl = t2 - t1_1
+                elapsedGetControl = t1_1 - t1
                 elapsedSendData = t1 - t0
                 elapsedStep = t3 - t2
                 elapsedTotal = t3 - t0
                 print(
-                    f"[MujcoSimulation] Step: {elapsedStep:.6f}, recv control: {elapsedRecvControl:.6f}, send sensors: {elapsedSendData:.6f}"
+                    f"[MujcoSimulation] Step: {elapsedStep:.6f}, get control: {elapsedGetControl:.6f}, apply control: {elapsedApplyControl:.6f} send sensors: {elapsedSendData:.6f}"
                 )
                 print(
-                    f"[MujocoSimulation] extract data: {(t0_1-t0):.6f}. extract sensors: {(t0_2-t0_1):.6f}, DroneSensorData: {(t0_3-t0_2):.6f}, RobotSensorData: {(t0_4-t0_3):.6f}, Set sensor messages: {(t1-t0_4):.6f}"
+                    f"[MujocoSimulation] extract data: {(t0_1-t0):.6f}, extract sensors: {(t0_2-t0_1):.6f}, DroneSensorData: {(t0_3-t0_2):.6f}, RobotSensorData: {(t0_4-t0_3):.6f}, Set sensor messages: {(t1-t0_4):.6f}"
                 )
                 print(f"[MujocoSimulation]  TOTAL: {elapsedTotal:.6f}")
 
@@ -348,13 +379,6 @@ class MujocoSimulation(threading.Thread):
         self._viewerRunning.clear()
         if self._viewerThread:
             self._viewerThread.join()
-
-    def getHookSitesPositions(self):
-        """Returns a dictionary {siteName: globalPosition} for all hook sites."""
-        return {
-            name: np.copy(self._data.site_xpos[sid])
-            for name, sid in self._hookSiteNamesIDs.items()
-        }
 
     def setViewersCamera(self, droneID):
         self._viewer.cam.type = mujoco.mjtCamera.mjCAMERA_TRACKING
