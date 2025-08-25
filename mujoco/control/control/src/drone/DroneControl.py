@@ -226,7 +226,7 @@ class DroneControl(threading.Thread):
                         f"[DroneControl] Target position: {self._currentTargetPosition}"
                     )
                 elif self._simTimer < 20:
-                    self._currentTargetPosition = np.array([0.0, 0.0, 5.0])
+                    self._currentTargetPosition = np.array([0.0, 3.0, 5.0])
                     print(
                         f"[DroneControl] Target position: {self._currentTargetPosition}"
                     )
