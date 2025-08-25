@@ -39,30 +39,37 @@ class MujocoSimulation(threading.Thread):
                 MODEL_PATH = "/home/nicolas/tfg/mujoco/model/drone/Model_GRVC_Drone.xml"
                 print("Simulating drone.")
                 self._droneController.setHeightReference(0.45)
+                self._onlyDrone = True
             case "0 cable":
                 MODEL_PATH = "/home/nicolas/tfg/mujoco/model/drone/Model_GRVC_Aerial_Manipulator_NoCable.xml"
                 print("Simulating aerial manipulator hanging by 0 cables.")
                 self._droneController.setHeightReference(2)
+                self._onlyDrone = False
             case "1 cable":
                 MODEL_PATH = "/home/nicolas/tfg/mujoco/model/drone/Model_GRVC_Aerial_Manipulator_1Cable.xml"
                 print("Simulating aerial manipulator hanging by 1 cable.")
                 self._droneController.setHeightReference(2)
+                self._onlyDrone = False
             case "2 cable":
                 MODEL_PATH = "/home/nicolas/tfg/mujoco/model/drone/Model_GRVC_Aerial_Manipulator_2Cable.xml"
                 print("Simulating aerial manipulator hanging by 2 cables.")
                 self._droneController.setHeightReference(2)
+                self._onlyDrone = False
             case "3 cable":
                 MODEL_PATH = "/home/nicolas/tfg/mujoco/model/drone/Model_GRVC_Aerial_Manipulator_3Cable.xml"
                 print("Simulating aerial manipulator hanging by 3 cables.")
                 self._droneController.setHeightReference(2)
+                self._onlyDrone = False
             case "4 cable":
                 MODEL_PATH = "/home/nicolas/tfg/mujoco/model/drone/Model_GRVC_Aerial_Manipulator_4Cable.xml"
                 print("Simulating aerial manipulator hanging by 4 cables.")
                 self._droneController.setHeightReference(2)
+                self._onlyDrone = False
             case _:
                 MODEL_PATH = "/home/nicolas/tfg/mujoco/model/drone/Model_GRVC_Drone.xml"
                 print("Simulating default model: drone.")
                 self._droneController.setHeightReference(0.45)
+                self._onlyDrone = True
 
         self._model = mujoco.MjModel.from_xml_path(MODEL_PATH)
         self._data = mujoco.MjData(self._model)
@@ -75,82 +82,90 @@ class MujocoSimulation(threading.Thread):
             self._model.actuator(i).name: i for i in range(self._model.nu)
         }
 
-        hookNamesByModel = {
-            "1 cable": [
-                "drone_side_center",
-                "arms_side_center",
-            ],
-            "2 cable": [
-                "drone_side_right",
-                "drone_side_left",
-                "arms_side_right",
-                "arms_side_left",
-            ],
-            "4 cable": [
-                "drone_side_right",
-                "drone_side_left",
-                "drone_side_back",
-                "drone_side_front",
-                "arms_side_right",
-                "arms_side_left",
-                "arms_side_back",
-                "arms_side_front",
-            ],
-        }
+        if not self._onlyDrone:
+            hookNamesByModel = {
+                "1 cable": [
+                    "drone_side_center",
+                    "arms_side_center",
+                ],
+                "2 cable": [
+                    "drone_side_right",
+                    "drone_side_left",
+                    "arms_side_right",
+                    "arms_side_left",
+                ],
+                "4 cable": [
+                    "drone_side_right",
+                    "drone_side_left",
+                    "drone_side_back",
+                    "drone_side_front",
+                    "arms_side_right",
+                    "arms_side_left",
+                    "arms_side_back",
+                    "arms_side_front",
+                ],
+            }
 
-        self._hookSiteNamesIDs = {}
-        if model in hookNamesByModel:
-            for name in hookNamesByModel[model]:
-                sid = mujoco.mj_name2id(self._model, mujoco.mjtObj.mjOBJ_SITE, name)
-                if sid == -1:
-                    raise RuntimeError(f"Site {name} not found in model.")
-                self._hookSiteNamesIDs[name] = sid
-        self._hookSiteNames = list(self._hookSiteNamesIDs.keys())
-        self._hookSiteIds = np.array(
-            list(self._hookSiteNamesIDs.values()), dtype=np.int32
-        )
-        hook_pairs = [
-            ("drone_side_center", "arms_side_center"),
-            ("drone_side_right", "arms_side_right"),
-            ("drone_side_left", "arms_side_left"),
-            ("drone_side_back", "arms_side_back"),
-            ("drone_side_front", "arms_side_front"),
-        ]
+            self._hookSiteNamesIDs = {}
+            if model in hookNamesByModel:
+                for name in hookNamesByModel[model]:
+                    sid = mujoco.mj_name2id(self._model, mujoco.mjtObj.mjOBJ_SITE, name)
+                    if sid == -1:
+                        raise RuntimeError(f"Site {name} not found in model.")
+                    self._hookSiteNamesIDs[name] = sid
+            self._hookSiteNames = list(self._hookSiteNamesIDs.keys())
+            self._hookSiteIds = np.array(
+                list(self._hookSiteNamesIDs.values()), dtype=np.int32
+            )
+            hook_pairs = [
+                ("drone_side_center", "arms_side_center"),
+                ("drone_side_right", "arms_side_right"),
+                ("drone_side_left", "arms_side_left"),
+                ("drone_side_back", "arms_side_back"),
+                ("drone_side_front", "arms_side_front"),
+            ]
 
-        self._droneHookIds = []
-        self._armsHookIds = []
+            self._droneHookIds = []
+            self._armsHookIds = []
 
-        for drone_name, arm_name in hook_pairs:
-            if (
-                drone_name in self._hookSiteNamesIDs
-                and arm_name in self._hookSiteNamesIDs
-            ):
-                self._droneHookIds.append(self._hookSiteNamesIDs[drone_name])
-                self._armsHookIds.append(self._hookSiteNamesIDs[arm_name])
+            for drone_name, arm_name in hook_pairs:
+                if (
+                    drone_name in self._hookSiteNamesIDs
+                    and arm_name in self._hookSiteNamesIDs
+                ):
+                    self._droneHookIds.append(self._hookSiteNamesIDs[drone_name])
+                    self._armsHookIds.append(self._hookSiteNamesIDs[arm_name])
 
-        self._droneHookIds = np.array(self._droneHookIds, dtype=np.int32)
-        self._armsHookIds = np.array(self._armsHookIds, dtype=np.int32)
+            self._droneHookIds = np.array(self._droneHookIds, dtype=np.int32)
+            self._armsHookIds = np.array(self._armsHookIds, dtype=np.int32)
 
-        self._droneHooks = np.zeros(
-            (len(self._droneHookIds), 3), dtype=np.float64
-        )  # (nd,3)
-        self._armsHooks = np.zeros(
-            (len(self._armsHookIds), 3), dtype=np.float64
-        )  # (na,3)
+            self._droneHooks = np.zeros(
+                (len(self._droneHookIds), 3), dtype=np.float64
+            )  # (nd,3)
+            self._armsHooks = np.zeros(
+                (len(self._armsHookIds), 3), dtype=np.float64
+            )  # (na,3)
 
-        self._licasJoints = ["q11", "q12", "q13", "q14", "q21", "q22", "q23", "q24"]
-        self._jointIndices = np.array(
-            [self._model.joint(name).qposadr for name in self._licasJoints]
-        )
-        self._velocityIndices = np.array(
-            [self._model.joint(name).dofadr for name in self._licasJoints]
-        )
-        self._fastReader = FastSensorReader(
-            self._jointIndices,
-            self._velocityIndices,
-            self._droneHookIds,
-            self._armsHookIds,
-        )
+            self._licasJoints = ["q11", "q12", "q13", "q14", "q21", "q22", "q23", "q24"]
+            self._jointIndices = np.array(
+                [self._model.joint(name).qposadr for name in self._licasJoints]
+            )
+            self._velocityIndices = np.array(
+                [self._model.joint(name).dofadr for name in self._licasJoints]
+            )
+        else:
+            self._droneHooks = np.zeros((0, 3), dtype=np.float64)  # (0,3)
+            self._armsHooks = np.zeros((0, 3), dtype=np.float64)  # (0,3)
+            # self._jointIndices = np.array([], dtype=np.int32)
+            # self._velocityIndices = np.array([], dtype=np.int32)
+            self._droneHookIds = np.array([], dtype=np.int32)
+            self._armsHookIds = np.array([], dtype=np.int32)
+            # self._droneHooks = np.zeros((0, 3), dtype=np.float64).reshape(0, 3)  # (0,3)
+            # self._armsHooks = np.zeros((0, 3), dtype=np.float64).reshape(0, 3)  # (0,3)
+            self._jointIndices = np.zeros((0, 1), dtype=np.int32).reshape(0, 1)  # (0,1)
+            self._velocityIndices = np.zeros((0, 1), dtype=np.int32).reshape(
+                0, 1
+            )  # (0,1)
 
         self._sensorInfo = []
         for i in range(self._model.nsensor):
@@ -160,7 +175,7 @@ class MujocoSimulation(threading.Thread):
 
         self._dataLock = threading.Lock()
 
-        self._timeDebugging = True
+        self._timeDebugging = False
         self._debugging = False
 
     def run(self):
@@ -184,12 +199,9 @@ class MujocoSimulation(threading.Thread):
         manipulatorID = mujoco.mj_name2id(
             self._model, mujoco.mjtObj.mjOBJ_BODY, "LiCAS_A1"
         )
-        if manipulatorID == -1:
-            raise RuntimeError("Body 'LiCAS_A1' not found in model.")
 
-        actuadoresConIDMenosUno = [k for k, v in self._actuatorsIDs.items() if v == -1]
-        if len(actuadoresConIDMenosUno) > 0:
-            print(f"[ERROR] Actuadores con ID -1: {actuadoresConIDMenosUno}")
+        if not self._onlyDrone and manipulatorID == -1:
+            raise RuntimeError("Body 'LiCAS_A1' not found in model.")
 
         droneGlobalPosition = np.zeros(3, dtype=np.float64)  # (3,)
         manipulatorGlobalPosition = np.zeros(3, dtype=np.float64)  # (3,)
@@ -209,19 +221,10 @@ class MujocoSimulation(threading.Thread):
 
             # iteration = self.testDroneControl(droneID, iteration)
 
-            ###########################################################
-            # --- Get sensor data and send to DroneControl thread ---
-            ###########################################################
+            ##########################################################################
+            # --- Get sensor data and send to DroneControl and SwayControl threads ---
+            ##########################################################################
             with self._dataLock:
-                # (
-                #     droneGlobalPosition,
-                #     manipulatorGlobalPosition,
-                #     qpos,
-                #     qvel,
-                #     currentTimestamp,
-                #     self._droneHooks,
-                #     self._armsHooks,
-                # ) = self._fastReader.read(self._data, droneID, manipulatorID)
                 currentTimestamp = self._data.time
                 extract_data(
                     self._data.xpos,
@@ -280,7 +283,6 @@ class MujocoSimulation(threading.Thread):
                     armsHooks=self._armsHooks,
                     droneHooks=self._droneHooks,
                 )
-                # COMPROBAR REAL TIME EN SIMULACION
 
             if timeDebug:
                 t0_4 = time.time()
@@ -294,9 +296,9 @@ class MujocoSimulation(threading.Thread):
             if timeDebug:
                 t1 = time.time()
 
-            ###########################################################
-            # --- Get control output from DroneControl thread ---
-            ###########################################################
+            ######################################################################
+            # --- Get control output from DroneControl and SwayControl threads ---
+            ######################################################################
             controlAction: ControlAction = self._droneController.getControlInputs()
             # allControlActions = {**controlAction.droneThrusters}
             allControlActions = dict(controlAction.droneThrusters)
@@ -436,26 +438,3 @@ class MujocoSimulation(threading.Thread):
 
 if __name__ == "__main__":
     MujocoSimulation.run()
-
-
-class FastSensorReader:
-    def __init__(self, jointIndices, velocityIndices, droneHookIds, armsHookIds):
-        self.jointIndices = np.array(jointIndices, dtype=np.int32)
-        self.velocityIndices = np.array(velocityIndices, dtype=np.int32)
-        self._droneHookIds = droneHookIds
-        self._armsHookIds = armsHookIds
-
-    def read(self, data, droneId, manipulatorId):
-
-        return extract_data(
-            data.xpos,
-            droneId,
-            manipulatorId,
-            data.qpos,
-            data.qvel,
-            self.jointIndices,
-            self.velocityIndices,
-            data.time,
-            self._droneHookIds,
-            self._armsHookIds,
-        )
