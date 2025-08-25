@@ -118,6 +118,8 @@ class DroneControl(threading.Thread):
         self._currentOrientation = np.zeros(4)
         self._currentTargetPosition = np.zeros(3)
 
+        self._simTimer = 0.0
+
         self._debugging = False
         self._debug = False
         self._timeDebugging = False
@@ -170,7 +172,6 @@ class DroneControl(threading.Thread):
         self._shutdownEvent.set()
 
     def getControlMessage(self):
-        # self._taskManagerManeuverEvent.wait(timeout=0.001)
         if self._taskManagerManeuverEvent.is_set():
             self._controlMessage = self._previousControlMessage
         else:
@@ -205,6 +206,38 @@ class DroneControl(threading.Thread):
                     self._controlMessage.referenceZ,
                 ]
             )
+
+            # Setting default target positions to create maneuvers if no command received and simulate always the same experiment.
+            if not self._taskManagerManeuverEvent.is_set():
+                self._simTimer = self._currentTimestamp
+                if self._simTimer < 5:
+                    self._currentTargetPosition = np.array([0.0, 0.0, 3.0])
+                    print(
+                        f"[DroneControl] Target position: {self._currentTargetPosition}"
+                    )
+                elif self._simTimer < 10:
+                    self._currentTargetPosition = np.array([3.0, 0.0, 3.0])
+                    print(
+                        f"[DroneControl] Target position: {self._currentTargetPosition}"
+                    )
+                elif self._simTimer < 15:
+                    self._currentTargetPosition = np.array([3.0, 3.0, 3.0])
+                    print(
+                        f"[DroneControl] Target position: {self._currentTargetPosition}"
+                    )
+                elif self._simTimer < 20:
+                    self._currentTargetPosition = np.array([0.0, 0.0, 5.0])
+                    print(
+                        f"[DroneControl] Target position: {self._currentTargetPosition}"
+                    )
+                elif self._simTimer < 25:
+                    self._currentTargetPosition = np.array([0.0, 0.0, 3.0])
+                    print(
+                        f"[DroneControl] Target position: {self._currentTargetPosition}"
+                    )
+                else:
+                    self._shutdownEvent.set()
+
             if self._currentTargetPosition[0] is None:
                 self._currentTargetPosition[0] = self._currentPosition[0]
             if self._currentTargetPosition[1] is None:
@@ -220,7 +253,7 @@ class DroneControl(threading.Thread):
         heightData = {
             "timestamp": self._currentTimestamp,
             "currentHeight": self._currentPosition[2],
-            "heightReference": self._controlMessage.referenceZ,
+            "heightReference": self._currentTargetPosition[2],
             "currentVelocity": self._currentVelocity.copy(),
         }
         self._heightController.setHeightData(heightData)
