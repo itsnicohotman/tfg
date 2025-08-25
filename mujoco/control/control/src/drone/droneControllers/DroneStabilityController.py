@@ -206,7 +206,28 @@ class DroneStabilityController(threading.Thread):
         angleErrors = np.array(self._historyAngleError)
         targetRate = np.array(self._historyTargetRate)
         rate = np.array(self._historyRate)
+
+        rotor1_output = [r[0] for r in self._historyRotorAdjustments]
+        rotor2_output = [r[1] for r in self._historyRotorAdjustments]
+        rotor3_output = [r[2] for r in self._historyRotorAdjustments]
+        rotor4_output = [r[3] for r in self._historyRotorAdjustments]
+
         labels = ["Roll", "Pitch", "Yaw"]
+
+        # --- Angle Error Plot (Dummy)---
+        plt.figure()
+        plt.clf()
+        for i in range(3):
+            plt.plot(time, angleErrors[:, i], label=labels[i])
+        plt.title("Attitude Angle Control Error")
+        plt.xlabel("Time [s]")
+        plt.ylabel("Error [rad]")
+        plt.legend()
+        plt.savefig(os.path.join(output_dir, "AttitudeAngleControl_Errors.png"))
+        plt.close()
+        print(
+            "[Drone Stability Controller] AttitudeAngleControl_Errors_dummy.png saved"
+        )
 
         # --- Angle Error Plot ---
         plt.figure()
@@ -259,24 +280,38 @@ class DroneStabilityController(threading.Thread):
             plt.plot(time, rate[:, i], label=f"Actual {labels[i]} Rate")
             plt.title(f"{labels[i]} Rate Control")
             plt.xlabel("Time [s]")
-            plt.ylabel("Angle [rad/s]")
+            plt.ylabel("Rate [rad/s]")
             plt.legend()
             plt.savefig(os.path.join(output_dir, f"{labels[i]}_Rate_Control.png"))
             plt.close()
             print(f"[Drone Stability Controller] {labels[i]}_Rate_Control.png saved")
 
-        roll_output = [v[0] for v in self._historyRotorAdjustments]
-        pitch_output = [v[1] for v in self._historyRotorAdjustments]
-        yaw_output = [v[2] for v in self._historyRotorAdjustments]
+        # --- Control Output Plot (Dummy) ---
+        plt.figure()
+        plt.clf()
+        plt.plot(time, rotor1_output, label="Rotor 1 Output")
+        plt.plot(time, rotor2_output, label="Rotor 2 Output")
+        plt.plot(time, rotor3_output, label="Rotor 3 Output")
+        plt.plot(time, rotor4_output, label="Rotor 4 Output")
+        plt.xlabel("Time [s]")
+        plt.ylabel("Control Output [N·m]")
+        plt.title("Control Output vs Time")
+        plt.grid(True)
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig(os.path.join(output_dir, "ControlOutput_dummy.png"))
+        plt.close()
+        print("[Drone Stability Controller] ControlOutput.png saved")
 
         # --- Control Output Plot ---
         plt.figure()
         plt.clf()
-        plt.plot(time, roll_output, label="Roll Output")
-        plt.plot(time, pitch_output, label="Pitch Output")
-        plt.plot(time, yaw_output, label="Yaw Output")
+        plt.plot(time, rotor1_output, label="Rotor 1 Output")
+        plt.plot(time, rotor2_output, label="Rotor 2 Output")
+        plt.plot(time, rotor3_output, label="Rotor 3 Output")
+        plt.plot(time, rotor4_output, label="Rotor 4 Output")
         plt.xlabel("Time [s]")
-        plt.ylabel("Control Output")
+        plt.ylabel("Control Output [N·m]")
         plt.title("Control Output vs Time")
         plt.grid(True)
         plt.legend()
