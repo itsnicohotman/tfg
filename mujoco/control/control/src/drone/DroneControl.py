@@ -208,35 +208,35 @@ class DroneControl(threading.Thread):
             )
 
             # Setting default target positions to create maneuvers if no command received and simulate always the same experiment.
-            if not self._taskManagerManeuverEvent.is_set():
-                self._simTimer = self._currentTimestamp
-                if self._simTimer < 5:
-                    self._currentTargetPosition = np.array([0.0, 0.0, 3.0])
-                    print(
-                        f"[DroneControl] Target position: {self._currentTargetPosition}"
-                    )
-                elif self._simTimer < 10:
-                    self._currentTargetPosition = np.array([3.0, 0.0, 3.0])
-                    print(
-                        f"[DroneControl] Target position: {self._currentTargetPosition}"
-                    )
-                elif self._simTimer < 15:
-                    self._currentTargetPosition = np.array([3.0, 3.0, 3.0])
-                    print(
-                        f"[DroneControl] Target position: {self._currentTargetPosition}"
-                    )
-                elif self._simTimer < 20:
-                    self._currentTargetPosition = np.array([0.0, 3.0, 5.0])
-                    print(
-                        f"[DroneControl] Target position: {self._currentTargetPosition}"
-                    )
-                elif self._simTimer < 25:
-                    self._currentTargetPosition = np.array([0.0, 0.0, 3.0])
-                    print(
-                        f"[DroneControl] Target position: {self._currentTargetPosition}"
-                    )
-                else:
-                    self._shutdownEvent.set()
+            # if not self._taskManagerManeuverEvent.is_set():
+            #     self._simTimer = self._currentTimestamp
+            #     if self._simTimer < 5:
+            #         self._currentTargetPosition = np.array([0.0, 0.0, 3.0])
+            #         print(
+            #             f"[DroneControl] Target position: {self._currentTargetPosition}"
+            #         )
+            #     elif self._simTimer < 10:
+            #         self._currentTargetPosition = np.array([3.0, 0.0, 3.0])
+            #         print(
+            #             f"[DroneControl] Target position: {self._currentTargetPosition}"
+            #         )
+            #     elif self._simTimer < 15:
+            #         self._currentTargetPosition = np.array([3.0, 3.0, 3.0])
+            #         print(
+            #             f"[DroneControl] Target position: {self._currentTargetPosition}"
+            #         )
+            #     elif self._simTimer < 20:
+            #         self._currentTargetPosition = np.array([0.0, 3.0, 5.0])
+            #         print(
+            #             f"[DroneControl] Target position: {self._currentTargetPosition}"
+            #         )
+            #     elif self._simTimer < 25:
+            #         self._currentTargetPosition = np.array([0.0, 0.0, 3.0])
+            #         print(
+            #             f"[DroneControl] Target position: {self._currentTargetPosition}"
+            #         )
+            #     else:
+            #         self._shutdownEvent.set()
 
             if self._currentTargetPosition[0] is None:
                 self._currentTargetPosition[0] = self._currentPosition[0]
