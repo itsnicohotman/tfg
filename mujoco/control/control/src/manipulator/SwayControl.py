@@ -8,6 +8,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib
 import os
+from qpsolvers import solve_qp
 
 
 class SwayControl(threading.Thread):
@@ -52,13 +53,17 @@ class SwayControl(threading.Thread):
             outputLimit=self._MAX_TORQUE,
         )
 
-        self._refFilter = FirstOrderRef(alpha=0.1)  # suaviza targetQ
-        self._velLPF = LowPass(alpha=0.15)  # suaviza qVelocity
+        self._refFilter = FirstOrderRef(alpha=0.1)  # smoothes targetQ
+        self._velLPF = LowPass(alpha=0.15)  # smoothes qVelocity
 
         # Inputs
         self._sensorData: RobotSensorData = None
         self._currentArmsHookPositions = None
         self._currentDroneHookPositions = None
+        self._robotComPos = np.zeros(3)
+        self._robotComVel = np.zeros(3)
+        self._robotComAcc = np.zeros(3)
+        self._robotComJac = np.zeros((3, 8))  # Jacobian of the CoM
 
         # Outputs
         self._robotControlAction: RobotControlAction = RobotControlAction(
@@ -72,7 +77,7 @@ class SwayControl(threading.Thread):
         self._currentAcceleration = np.zeros(3)
         self._currentAngularVelocity = np.zeros(3)
         self._currentVelocity = np.zeros(3)
-        self._currentTargetPosition = np.zeros(3)
+        self._currentTargetRobotPosition = np.zeros(3)
         self._currentDroneAcceleration = np.zeros(3)
         self._currentCableVectorAvg = np.zeros(3)
         self._prevThetas = (0.0, 0.0)
@@ -80,8 +85,11 @@ class SwayControl(threading.Thread):
 
         self._targetQPosition = np.zeros(8)  # Target joint positions
         self._qPosition = np.zeros(8)  # Current joint positions
-        self._qVelocity = np.zeros(8)  # Current joint velocities
+        self._qVelocity = np.zeros(8)  # Current joint
+        self._qVelocityRef = np.zeros(8)  # Reference joint velocities
+        self._qPositionRef = np.zeros(8)  # Reference joint positions
         self._robotControlAction.jointMotors = {}
+        self._robotComError = np.zeros(3)
 
         # Store for analysis
         self._historyReferencePosition = []
@@ -96,6 +104,7 @@ class SwayControl(threading.Thread):
         self._historyQPositionReference = []
         self._historyQVelocity = []
         self._historyQVelocityReference = []
+        self._historyRobotComPosError = []
 
         self._debugging = False
         self._timeDebugging = False
@@ -147,12 +156,12 @@ class SwayControl(threading.Thread):
                 self._targetQPosition = np.array(
                     [1.57, 0.0, 0.0, 0.0, -0.72, 0.0, 0.0, -0.5]
                 )
-                print(f"[SwayControl] Target joint position: {self._targetQPosition}")
+                # print(f"[SwayControl] Target joint position: {self._targetQPosition}")
             elif self._currentTimestamp < 10:
                 self._targetQPosition = np.array(
                     [1.57, 0.0, 0.3, 0.0, -0.72, 1, 0.0, 0.0]
                 )
-                print(f"[SwayControl] Target joint position: {self._targetQPosition}")
+                # print(f"[SwayControl] Target joint position: {self._targetQPosition}")
             elif self._currentTimestamp < 15:
                 self._targetQPosition = np.array(
                     [1.57, 0.6, 0.3, 0.85, -0.72, 1, 0.0, 0.5]
@@ -161,16 +170,18 @@ class SwayControl(threading.Thread):
                 self._targetQPosition = np.array(
                     [1.57, 0.6, 0.3, 0.85, -0.72, 1.57, 0.7, 0.0]
                 )
-                print(f"[SwayControl] Target joint position: {self._targetQPosition}")
+                # print(f"[SwayControl] Target joint position: {self._targetQPosition}")
             elif self._currentTimestamp < 25:
                 self._targetQPosition = np.array(
                     [0.0, 0.6, 0.3, 0.85, 0.0, 1.57, 0.7, 0.0]
                 )
-                print(f"[SwayControl] Target joint position: {self._targetQPosition}")
+                # print(f"[SwayControl] Target joint position: {self._targetQPosition}")
             else:
                 self._shutdownEvent.set()
 
             t1 = time.time()
+
+            self._robotComError = self._currentTargetRobotPosition - self._robotComPos
 
             if iteration == 1 or iteration % 5 == 0:
                 targetQPosition = self._refFilter.step(self._targetQPosition)
@@ -221,6 +232,7 @@ class SwayControl(threading.Thread):
             self._historyQVelocity.append(self._qVelocity.copy())
             self._historyQVelocityReference.append(qdReference.copy())
             self._historyControlAction.append(torque.copy())
+            self._historyRobotComPosError.append(self._robotComError.copy())
 
             elapsedCycle = time.time() - t0
 
@@ -284,7 +296,7 @@ class SwayControl(threading.Thread):
                 sensorData.sensorValues["robot_gyro"]
             )
             self._currentVelocity = np.array(sensorData.sensorValues["robot_vel"])
-            self._currentTargetPosition = np.array(
+            self._currentTargetRobotPosition = np.array(
                 sensorData.dronePosition
                 - [0.0, 0.0, 0.6245]  # Adjusted for cables and robot base offset
             )
@@ -293,12 +305,20 @@ class SwayControl(threading.Thread):
             self._currentDroneAcceleration = sensorData.droneAcceleration
             self._currentArmsHookPositions = sensorData.armsHooks
             self._currentDroneHookPositions = sensorData.droneHooks
-            if self._currentTargetPosition[0] is None:
-                self._currentTargetPosition[0] = self._currentPosition[0]
-            if self._currentTargetPosition[1] is None:
-                self._currentTargetPosition[1] = self._currentPosition[1]
-            if self._currentTargetPosition[2] is None:
-                self._currentTargetPosition[2] = self._currentPosition[2]
+            self._robotComPos = sensorData.robotComPos
+            self._robotComVel = sensorData.robotComVel
+            self._robotComAcc = sensorData.robotComAcc
+            self._robotComJac = sensorData.robotComJac
+            self._robotComPosError = (
+                self._currentTargetRobotPosition - self._robotComPos
+            )
+
+            if self._currentTargetRobotPosition[0] is None:
+                self._currentTargetRobotPosition[0] = self._currentPosition[0]
+            if self._currentTargetRobotPosition[1] is None:
+                self._currentTargetRobotPosition[1] = self._currentPosition[1]
+            if self._currentTargetRobotPosition[2] is None:
+                self._currentTargetRobotPosition[2] = self._currentPosition[2]
         else:
             pass
 
@@ -332,11 +352,61 @@ class SwayControl(threading.Thread):
 
         self._prevThetas = (thetaX, thetaY)
 
+        # Calculate desired load CoM acceleration
+        aCOMdes = -(Kp / self._mass) * np.array([thetaX, thetaY]) - (
+            Kd / self._mass
+        ) * np.array([dthetaX, dthetaY])
+        if aCOMdes[0] > 1.0:
+            aCOMdes[0] = 1.0
+        if aCOMdes[1] > 1.0:
+            aCOMdes[1] = 1.0
+
+        Jdot_qDot = self._velocityCOM - self._JCOM @ self._qVelocity
+
+        # Solving optimization problem minimum square error through QP.
+        # min || JCOM * qdd + Jdot_qDot - aCOMdes ||^2
+        lambdaReg = 1e-3
+        H = 2 * (
+            self._JCOM.T @ self._JCOM + lambdaReg * np.eye(8)
+        )  # Regularization term
+        f = 2 * (self._JCOM.T @ Jdot_qDot - self._JCOM.T @ aCOMdes)
+        # No constraints
+        A_eq = None
+        b_eq = None
+        A_ineq = None
+        b_ineq = None
+
+        ddq_max = np.ones(self._JCOM.shape[1]) * 1.0
+        ddq_min = -ddq_max
+
+        qdd_opt = solve_qp(
+            H, f, A_ineq, b_ineq, A_eq, b_eq, lb=ddq_min, ub=ddq_max, solver="cvxopt"
+        )
+        if qdd_opt is None:
+            print("[QP] WARNING: No solution found, fallback to zeros")
+            qdd_opt = np.zeros(self._JCOM.shape[1])
+
+        qPosRef, qVelRef = self.integrateStates(qdd_opt)
+        qsp_ref = qPosRef[1]  # left_shoulder_pitch
+        qsr_ref = qPosRef[0]  # left_shoulder_roll
         # control feedback: PD sobre ángulo de la cuerda
-        qsp_ref = pitchFF - Kp * thetaX - Kd * dthetaX
-        qsr_ref = rollFF - Kp * thetaY - Kd * dthetaY
+        # qsp_ref = pitchFF - Kp * thetaX - Kd * dthetaX
+        # qsr_ref = rollFF - Kp * thetaY - Kd * dthetaY
 
         return qsp_ref, qsr_ref
+
+    def integrateStates(self, qdd):
+        dt = 0.02
+
+        # Actualización de posición con término de aceleración
+        self._qPositionRef = (
+            self._qPositionRef + self._qVelocityRef * dt + 0.5 * qdd * dt**2
+        )
+
+        # Luego actualizar velocidad
+        self._qVelocityRef = self._qVelocityRef + qdd * dt
+
+        return self._qPositionRef, self._qVelocityRef
 
     def computeCableVectors(self, armsHooks, droneHooks):
         """
@@ -376,8 +446,10 @@ class SwayControl(threading.Thread):
         # Save graphs in separate folders for left and right arms
         dir_left = "/home/nicolas/tfg/Memoria/GraficasRobot/BrazoIzquierdo"
         dir_right = "/home/nicolas/tfg/Memoria/GraficasRobot/BrazoDerecho"
+        dir_sway = "/home/nicolas/tfg/Memoria/GraficasRobot/SwayControl"
         os.makedirs(dir_left, exist_ok=True)
         os.makedirs(dir_right, exist_ok=True)
+        os.makedirs(dir_sway, exist_ok=True)
         matplotlib.use("Agg")
 
         # Convert to arrays for easier indexing
@@ -387,6 +459,7 @@ class SwayControl(threading.Thread):
         q_vel = np.array(self._historyQVelocity)
         q_vel_ref = np.array(self._historyQVelocityReference)
         control = np.array(self._historyControlAction)
+        robotPosError = np.array(self._historyRobotComPosError)
 
         # Names and groups of joints
         jointNames = [
@@ -606,6 +679,28 @@ class SwayControl(threading.Thread):
             edgecolor="w",
         )
         plt.close()
+
+        # --- Robot oscillations ---
+        oscillationsNames = ["Oscillations in X axis", "Oscillations in Y axis"]
+        oscillationsLabels = ["x_oscillations", "y_oscillations"]
+        for i in range(2):
+            plt.figure()
+            plt.plot(
+                time,
+                robotPosError[:, i],
+                label=pretty_name(oscillationsLabels[i]),
+            )
+            plt.xlabel("Time [s]")
+            plt.ylabel("Distance [m]")
+            plt.title(oscillationsNames[i])
+            plt.legend()
+            plt.grid(True)
+            plt.savefig(
+                os.path.join(dir_sway, f"{oscillationsLabels[i]}.png"),
+                facecolor="w",
+                edgecolor="w",
+            )
+            plt.close()
 
         print(f"✅ Graphs saved in:\n  {dir_left}\n  {dir_right}")
 

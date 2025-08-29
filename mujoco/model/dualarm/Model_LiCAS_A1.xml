@@ -30,7 +30,7 @@
   <worldbody>    
     <!-- Create the robotic arm following a tree structure from the base link -->
     <body name="LiCAS_A1" pos="0 0 1.3755">
-      <!-- <freejoint/> -->
+      <freejoint/>
       <site name="arms_side_center" pos="0 0 0.05" group="2" rgba="0 1 0 1" euler="0 1.57 0"/>
       <site name="arms_side_left" pos="0 0.06 0.04" group="2" rgba="0 0 1 1" euler="0 1.57 0"/>
       <site name="arms_side_right" pos="0 -0.06 0.04" group="2" rgba="1 0 0 1" euler="0 1.57 0"/>

@@ -43,7 +43,11 @@ class RobotSensorData:
     ]  # Joints velocity (qvel)
     droneAcceleration: list[float, float, float]  # Drone's linear acceleration
     armsHooks: list  # List with anchor points on the arms' side
-    droneHooks: list  # List with anchor points on the drone' side
+    droneHooks: list  # List with anchor points on the drone'
+    robotComPos: list[float, float, float]  # Robot's center of mass position
+    robotComVel: list[float, float, float]  # Robot's center of mass velocity
+    robotComAcc: list[float, float, float]  # Robot's center of mass acceleration
+    robotComJac: list  # Robot's center of mass Jacobian
 
 
 @dataclass

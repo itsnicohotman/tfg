@@ -18,7 +18,7 @@ from src.drone.DroneControl import DroneControl
 from src.manipulator.SwayControl import SwayControl
 
 from cython_modules.cy_sim_utils import extract_sensor_values, apply_control_inputs
-from cython_modules.fast_mujoco_utils import extract_data
+from cython_modules.fast_mujoco_utils import extract_data, compute_com_jac_and_accel
 
 
 class MujocoSimulation(threading.Thread):
@@ -81,6 +81,11 @@ class MujocoSimulation(threading.Thread):
         self._actuatorsIDs = {
             self._model.actuator(i).name: i for i in range(self._model.nu)
         }
+
+        self._manipCOMPos = np.zeros(3, dtype=np.float64)  # (3,)
+        self._manipCOMVel = np.zeros(3, dtype=np.float64)  # (3,)
+        self._manipCOMAcc = np.zeros(3, dtype=np.float64)  # (3,)
+        self._manipCOMJac = np.zeros((3, self._model.nv), dtype=np.float64)  # (3,nv)
 
         if not self._onlyDrone:
             hookNamesByModel = {
@@ -156,12 +161,8 @@ class MujocoSimulation(threading.Thread):
         else:
             self._droneHooks = np.zeros((0, 3), dtype=np.float64)  # (0,3)
             self._armsHooks = np.zeros((0, 3), dtype=np.float64)  # (0,3)
-            # self._jointIndices = np.array([], dtype=np.int32)
-            # self._velocityIndices = np.array([], dtype=np.int32)
             self._droneHookIds = np.array([], dtype=np.int32)
             self._armsHookIds = np.array([], dtype=np.int32)
-            # self._droneHooks = np.zeros((0, 3), dtype=np.float64).reshape(0, 3)  # (0,3)
-            # self._armsHooks = np.zeros((0, 3), dtype=np.float64).reshape(0, 3)  # (0,3)
             self._jointIndices = np.zeros((0, 1), dtype=np.int32).reshape(0, 1)  # (0,1)
             self._velocityIndices = np.zeros((0, 1), dtype=np.int32).reshape(
                 0, 1
@@ -207,6 +208,26 @@ class MujocoSimulation(threading.Thread):
         manipulatorGlobalPosition = np.zeros(3, dtype=np.float64)  # (3,)
         qpos = np.zeros(len(self._jointIndices), dtype=np.float64)  # (nj,)
         qvel = np.zeros(len(self._velocityIndices), dtype=np.float64)  # (nv,)
+        sensorDataMessage = SensorData(
+            timestamp=0.0, timestep=0.0, sensorValues={}, dronePosition=[]
+        )
+        robotSensorDataMessage = RobotSensorData(
+            timestamp=0.0,
+            timestep=0.0,
+            sensorValues={},
+            manipulatorPosition=[],
+            dronePosition=[],
+            jointsPosition=[],
+            jointsVelocity=[],
+            droneAcceleration=[],
+            armsHooks=[],
+            droneHooks=[],
+            robotComPos=[],
+            robotComVel=[],
+            robotComAcc=[],
+            robotComJac=[],
+        )
+
         iteration = 0
         timestep = self._model.opt.timestep
         nextTime = time.perf_counter()
@@ -224,26 +245,37 @@ class MujocoSimulation(threading.Thread):
             ##########################################################################
             # --- Get sensor data and send to DroneControl and SwayControl threads ---
             ##########################################################################
-            with self._dataLock:
-                currentTimestamp = self._data.time
-                extract_data(
-                    self._data.xpos,
-                    droneID,
+            # with self._dataLock:
+            currentTimestamp = self._data.time
+            extract_data(
+                self._data.xpos,
+                droneID,
+                manipulatorID,
+                self._data.qpos,
+                self._data.qvel,
+                self._jointIndices,
+                self._velocityIndices,
+                self._droneHookIds,
+                self._armsHookIds,
+                droneGlobalPosition,
+                manipulatorGlobalPosition,
+                qpos,
+                qvel,
+                self._droneHooks,
+                self._armsHooks,
+            )
+            if iteration % 10 == 0:
+                compute_com_jac_and_accel(
+                    self._model,
+                    self._data,
                     manipulatorID,
-                    self._data.qpos,
-                    self._data.qvel,
-                    self._jointIndices,
-                    self._velocityIndices,
-                    self._droneHookIds,
-                    self._armsHookIds,
-                    droneGlobalPosition,
-                    manipulatorGlobalPosition,
-                    qpos,
-                    qvel,
-                    self._droneHooks,
-                    self._armsHooks,
+                    self._manipCOMPos,
+                    self._manipCOMVel,
+                    self._manipCOMAcc,
+                    self._manipCOMJac,
                 )
-                sensorData = np.copy(self._data.sensordata)
+            # sensorData = np.copy(self._data.sensordata)
+            sensorData = self._data.sensordata
 
             if timeDebug:
                 t0_1 = time.time()
@@ -260,36 +292,36 @@ class MujocoSimulation(threading.Thread):
             if timeDebug:
                 t0_2 = time.time()
 
-            sensorDataMessage = SensorData(
-                timestamp=currentTimestamp,
-                timestep=self._model.opt.timestep,
-                sensorValues=droneSensorValues,
-                dronePosition=droneGlobalPosition,
-            )
+            sensorDataMessage.timestamp = currentTimestamp
+            sensorDataMessage.timestep = self._model.opt.timestep
+            sensorDataMessage.sensorValues = droneSensorValues
+            sensorDataMessage.dronePosition = droneGlobalPosition
 
             if timeDebug:
                 t0_3 = time.time()
 
-            if self._swayControllerEnabled:
-                robotSensorDataMessage = RobotSensorData(
-                    timestamp=currentTimestamp,
-                    timestep=self._model.opt.timestep,
-                    sensorValues=robotSensorValues,
-                    manipulatorPosition=manipulatorGlobalPosition,
-                    dronePosition=droneGlobalPosition,
-                    jointsPosition=qpos,
-                    jointsVelocity=qvel,
-                    droneAcceleration=droneSensorValues["body_linacc"],
-                    armsHooks=self._armsHooks,
-                    droneHooks=self._droneHooks,
-                )
+            # if self._swayControllerEnabled:
+            robotSensorDataMessage.timestamp = currentTimestamp
+            robotSensorDataMessage.timestep = self._model.opt.timestep
+            robotSensorDataMessage.sensorValues = robotSensorValues
+            robotSensorDataMessage.manipulatorPosition = manipulatorGlobalPosition
+            robotSensorDataMessage.dronePosition = droneGlobalPosition
+            robotSensorDataMessage.jointsPosition = qpos
+            robotSensorDataMessage.jointsVelocity = qvel
+            robotSensorDataMessage.droneAcceleration = droneSensorValues["body_linacc"]
+            robotSensorDataMessage.armsHooks = self._armsHooks
+            robotSensorDataMessage.droneHooks = self._droneHooks
+            robotSensorDataMessage.robotComPos = self._manipCOMPos
+            robotSensorDataMessage.robotComVel = self._manipCOMVel
+            robotSensorDataMessage.robotComAcc = self._manipCOMAcc
+            robotSensorDataMessage.robotComJac = self._manipCOMJac
 
             if timeDebug:
                 t0_4 = time.time()
 
             self._droneController.setSensorData(sensorDataMessage)
-            if self._swayControllerEnabled:
-                self._swayController.setSensorData(robotSensorDataMessage)
+            # if self._swayControllerEnabled:
+            self._swayController.setSensorData(robotSensorDataMessage)
             if debug:
                 print(f"[MujocoSimulation] sensorDataMessage: {sensorDataMessage}")
 
@@ -319,8 +351,8 @@ class MujocoSimulation(threading.Thread):
                 t2 = time.time()
 
             # Simulation step: timestep = 0.001s
-            with self._dataLock:
-                mujoco.mj_step(self._model, self._data)
+            # with self._dataLock:
+            mujoco.mj_step(self._model, self._data)
             if not self._droneController._updateEvent.is_set():
                 self._droneController.setUpdateEvent()
             if not self._swayController._updateEvent.is_set():
@@ -338,27 +370,31 @@ class MujocoSimulation(threading.Thread):
             sleepDuration = nextTime - now
 
             if timeDebug:
-                real_elapsed = time.time() - real_start
-                sim_elapsed = currentTimestamp - sim_start
+                elapsedTotalTooLarge = (t3 - t0) > 0.002
+                elapsedTotalTooLarge = True
+                if elapsedTotalTooLarge:
+                    real_elapsed = time.time() - real_start
+                    sim_elapsed = currentTimestamp - sim_start
 
-                print(
-                    f"[MujocoSimulation] Elapsed Cycle: {elapsedCycle}, Sleep Duration; {sleepDuration}."
-                )
-                print(
-                    f"[MujocoSimulation] Sim Time: {sim_elapsed:.2f} s, Real Time: {real_elapsed:.2f} s"
-                )
-                elapsedApplyControl = t2 - t1_1
-                elapsedGetControl = t1_1 - t1
-                elapsedSendData = t1 - t0
-                elapsedStep = t3 - t2
-                elapsedTotal = t3 - t0
-                print(
-                    f"[MujcoSimulation] Step: {elapsedStep:.6f}, get control: {elapsedGetControl:.6f}, apply control: {elapsedApplyControl:.6f} send sensors: {elapsedSendData:.6f}"
-                )
-                print(
-                    f"[MujocoSimulation] extract data: {(t0_1-t0):.6f}, extract sensors: {(t0_2-t0_1):.6f}, DroneSensorData: {(t0_3-t0_2):.6f}, RobotSensorData: {(t0_4-t0_3):.6f}, Set sensor messages: {(t1-t0_4):.6f}"
-                )
-                print(f"[MujocoSimulation]  TOTAL: {elapsedTotal:.6f}")
+                    print(
+                        f"[MujocoSimulation] Elapsed Cycle: {elapsedCycle}, Sleep Duration; {sleepDuration}."
+                    )
+                    print(
+                        f"[MujocoSimulation] Sim Time: {sim_elapsed:.2f} s, Real Time: {real_elapsed:.2f} s"
+                    )
+                    elapsedApplyControl = t2 - t1_1
+                    elapsedGetControl = t1_1 - t1
+                    elapsedSendData = t1 - t0
+                    elapsedStep = t3 - t2
+                    elapsedTotal = t3 - t0
+
+                    print(
+                        f"[MujcoSimulation] Step: {elapsedStep:.6f}, get control: {elapsedGetControl:.6f}, apply control: {elapsedApplyControl:.6f} send sensors: {elapsedSendData:.6f}"
+                    )
+                    print(
+                        f"[MujocoSimulation] extract data: {(t0_1-t0):.6f}, extract sensors: {(t0_2-t0_1):.6f}, DroneSensorData: {(t0_3-t0_2):.6f}, RobotSensorData: {(t0_4-t0_3):.6f}, Set sensor messages: {(t1-t0_4):.6f}"
+                    )
+                    print(f"[MujocoSimulation]  TOTAL: {elapsedTotal:.6f}")
 
             if sleepDuration > 0.0001:
                 time.sleep(sleepDuration - 0.00005)  # Sleeps most of the time
@@ -367,7 +403,7 @@ class MujocoSimulation(threading.Thread):
             while time.perf_counter() < nextTime:
                 pass
 
-            if timeDebug:
+            if timeDebug and elapsedTotal > 0.002:
                 totalCycle = time.perf_counter() - tStart
                 print(f"[MujocoSimulation] Total Cycle: {totalCycle}.")
 
@@ -404,6 +440,8 @@ class MujocoSimulation(threading.Thread):
         """Launch passive viewer on a separate thread."""
         n = 0
         periodSum = 0
+        sleepTimeSum = 0
+        timeDebugging = False
         PERIOD = 0.01
         with mujoco.viewer.launch_passive(
             self._model, self._data, show_left_ui=False, show_right_ui=True
@@ -420,16 +458,21 @@ class MujocoSimulation(threading.Thread):
                             print("[Viewer Thread] Data locked.")
                     n += 1
                     tf = time.perf_counter()
-                    periodSum += tf - ts
-                    sleepTime = PERIOD - (tf - ts)
+                    cycleDuration = tf - ts
+                    periodSum += cycleDuration
+                    sleepTime = PERIOD - (cycleDuration)
+                    sleepTimeSum += sleepTime
                     if sleepTime > 0:
                         time.sleep(sleepTime)  # FPS control (100 Hz)
                 except Exception as e:
                     print(f"[Viewer Thread] Error: {e}")
                     break
-
+                if timeDebugging and n % 200 == 0:
+                    print(
+                        f"[Viewer Thread] Cycle Duration: {cycleDuration}, Time Slept: {sleepTime}."
+                    )
             self._viewer.close()
-        avgPeriod = periodSum / n
+        avgPeriod = (periodSum + sleepTimeSum) / n
         avgFrequency = 1 / avgPeriod
         print(
             f"[MujocViewerThread] Average Frequency: {avgFrequency}, Number of Syncs: {n}"
