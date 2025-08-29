@@ -350,7 +350,7 @@ class MujocoSimulation(threading.Thread):
             if timeDebug:
                 t2 = time.time()
 
-            # Simulation step: timestep = 0.001s
+            # Simulation step: timestep = 0.002s
             # with self._dataLock:
             mujoco.mj_step(self._model, self._data)
             if not self._droneController._updateEvent.is_set():
@@ -444,7 +444,7 @@ class MujocoSimulation(threading.Thread):
         timeDebugging = False
         PERIOD = 0.01
         with mujoco.viewer.launch_passive(
-            self._model, self._data, show_left_ui=False, show_right_ui=True
+            self._model, self._data, show_left_ui=False, show_right_ui=False
         ) as viewer:
             self._viewer = viewer
             droneID = mujoco.mj_name2id(self._model, mujoco.mjtObj.mjOBJ_BODY, "drone")

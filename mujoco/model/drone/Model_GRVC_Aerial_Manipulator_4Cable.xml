@@ -45,8 +45,8 @@
       <site name="drone_side_back" pos="-0.06 0 -0.07" group="2" rgba="0 1 0 1"/>
       <composite type="cable" prefix="cable1_" curve="s" count="10 1 1" size="0.5" offset="0 0.06 -0.07" quat="0 -0.7071 0 0.7071" initial="ball">
         <plugin plugin="mujoco.elasticity.cable">
-          <config key="twist" value="1e7" />
-          <config key="bend" value="1e7" />
+          <config key="twist" value="1e6" />
+          <config key="bend" value="1e6" />
           <config key="vmax" value="100" />
         </plugin>
         <joint kind="main" damping="0.05" />
@@ -56,8 +56,8 @@
 
       <composite type="cable" prefix="cable2_" curve="s" count="10 1 1" size="0.5" offset="0 -0.06 -0.07" quat="0 -0.7071 0 0.7071" initial="ball">
         <plugin plugin="mujoco.elasticity.cable">
-          <config key="twist" value="1e7" />
-          <config key="bend" value="1e7" />
+          <config key="twist" value="1e6" />
+          <config key="bend" value="1e6" />
           <config key="vmax" value="100" />
         </plugin>
         <joint kind="main" damping="0.05" />
@@ -67,8 +67,8 @@
 
       <composite type="cable" prefix="cable3_" curve="s" count="10 1 1" size="0.5" offset="0.06 0 -0.07" quat="0 -0.7071 0 0.7071" initial="ball">
         <plugin plugin="mujoco.elasticity.cable">
-          <config key="twist" value="1e7" />
-          <config key="bend" value="1e7" />
+          <config key="twist" value="1e6" />
+          <config key="bend" value="1e6" />
           <config key="vmax" value="100" />
         </plugin>
         <joint kind="main" damping="0.05" />
@@ -78,8 +78,8 @@
 
       <composite type="cable" prefix="cable4_" curve="s" count="10 1 1" size="0.5" offset="-0.06 0 -0.07" quat="0 -0.7071 0 0.7071" initial="ball">
         <plugin plugin="mujoco.elasticity.cable">
-          <config key="twist" value="1e7" />
-          <config key="bend" value="1e7" />
+          <config key="twist" value="1e6" />
+          <config key="bend" value="1e6" />
           <config key="vmax" value="100" />
         </plugin>
         <joint kind="main" damping="0.05" />
