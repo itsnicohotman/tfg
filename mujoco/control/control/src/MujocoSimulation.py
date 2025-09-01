@@ -18,7 +18,7 @@ from src.drone.DroneControl import DroneControl
 from src.manipulator.SwayControl import SwayControl
 
 from cython_modules.cy_sim_utils import extract_sensor_values, apply_control_inputs
-from cython_modules.fast_mujoco_utils import extract_data, compute_com_jac_and_accel
+from cython_modules.fast_mujoco_utils import extract_data
 
 
 class MujocoSimulation(threading.Thread):
@@ -82,75 +82,7 @@ class MujocoSimulation(threading.Thread):
             self._model.actuator(i).name: i for i in range(self._model.nu)
         }
 
-        self._manipCOMPos = np.zeros(3, dtype=np.float64)  # (3,)
-        self._manipCOMVel = np.zeros(3, dtype=np.float64)  # (3,)
-        self._manipCOMAcc = np.zeros(3, dtype=np.float64)  # (3,)
-        self._manipCOMJac = np.zeros((3, self._model.nv), dtype=np.float64)  # (3,nv)
-
         if not self._onlyDrone:
-            hookNamesByModel = {
-                "1 cable": [
-                    "drone_side_center",
-                    "arms_side_center",
-                ],
-                "2 cable": [
-                    "drone_side_right",
-                    "drone_side_left",
-                    "arms_side_right",
-                    "arms_side_left",
-                ],
-                "4 cable": [
-                    "drone_side_right",
-                    "drone_side_left",
-                    "drone_side_back",
-                    "drone_side_front",
-                    "arms_side_right",
-                    "arms_side_left",
-                    "arms_side_back",
-                    "arms_side_front",
-                ],
-            }
-
-            self._hookSiteNamesIDs = {}
-            if model in hookNamesByModel:
-                for name in hookNamesByModel[model]:
-                    sid = mujoco.mj_name2id(self._model, mujoco.mjtObj.mjOBJ_SITE, name)
-                    if sid == -1:
-                        raise RuntimeError(f"Site {name} not found in model.")
-                    self._hookSiteNamesIDs[name] = sid
-            self._hookSiteNames = list(self._hookSiteNamesIDs.keys())
-            self._hookSiteIds = np.array(
-                list(self._hookSiteNamesIDs.values()), dtype=np.int32
-            )
-            hook_pairs = [
-                ("drone_side_center", "arms_side_center"),
-                ("drone_side_right", "arms_side_right"),
-                ("drone_side_left", "arms_side_left"),
-                ("drone_side_back", "arms_side_back"),
-                ("drone_side_front", "arms_side_front"),
-            ]
-
-            self._droneHookIds = []
-            self._armsHookIds = []
-
-            for drone_name, arm_name in hook_pairs:
-                if (
-                    drone_name in self._hookSiteNamesIDs
-                    and arm_name in self._hookSiteNamesIDs
-                ):
-                    self._droneHookIds.append(self._hookSiteNamesIDs[drone_name])
-                    self._armsHookIds.append(self._hookSiteNamesIDs[arm_name])
-
-            self._droneHookIds = np.array(self._droneHookIds, dtype=np.int32)
-            self._armsHookIds = np.array(self._armsHookIds, dtype=np.int32)
-
-            self._droneHooks = np.zeros(
-                (len(self._droneHookIds), 3), dtype=np.float64
-            )  # (nd,3)
-            self._armsHooks = np.zeros(
-                (len(self._armsHookIds), 3), dtype=np.float64
-            )  # (na,3)
-
             self._licasJoints = ["q11", "q12", "q13", "q14", "q21", "q22", "q23", "q24"]
             self._jointIndices = np.array(
                 [self._model.joint(name).qposadr for name in self._licasJoints]
@@ -159,10 +91,6 @@ class MujocoSimulation(threading.Thread):
                 [self._model.joint(name).dofadr for name in self._licasJoints]
             )
         else:
-            self._droneHooks = np.zeros((0, 3), dtype=np.float64)  # (0,3)
-            self._armsHooks = np.zeros((0, 3), dtype=np.float64)  # (0,3)
-            self._droneHookIds = np.array([], dtype=np.int32)
-            self._armsHookIds = np.array([], dtype=np.int32)
             self._jointIndices = np.zeros((0, 1), dtype=np.int32).reshape(0, 1)  # (0,1)
             self._velocityIndices = np.zeros((0, 1), dtype=np.int32).reshape(
                 0, 1
@@ -219,13 +147,6 @@ class MujocoSimulation(threading.Thread):
             dronePosition=[],
             jointsPosition=[],
             jointsVelocity=[],
-            droneAcceleration=[],
-            armsHooks=[],
-            droneHooks=[],
-            robotComPos=[],
-            robotComVel=[],
-            robotComAcc=[],
-            robotComJac=[],
         )
 
         iteration = 0
@@ -245,37 +166,22 @@ class MujocoSimulation(threading.Thread):
             ##########################################################################
             # --- Get sensor data and send to DroneControl and SwayControl threads ---
             ##########################################################################
-            # with self._dataLock:
-            currentTimestamp = self._data.time
-            extract_data(
-                self._data.xpos,
-                droneID,
-                manipulatorID,
-                self._data.qpos,
-                self._data.qvel,
-                self._jointIndices,
-                self._velocityIndices,
-                self._droneHookIds,
-                self._armsHookIds,
-                droneGlobalPosition,
-                manipulatorGlobalPosition,
-                qpos,
-                qvel,
-                self._droneHooks,
-                self._armsHooks,
-            )
-            if iteration % 10 == 0:
-                compute_com_jac_and_accel(
-                    self._model,
-                    self._data,
+            with self._dataLock:
+                currentTimestamp = self._data.time
+                extract_data(
+                    self._data.site_xpos,
+                    droneID,
                     manipulatorID,
-                    self._manipCOMPos,
-                    self._manipCOMVel,
-                    self._manipCOMAcc,
-                    self._manipCOMJac,
+                    self._data.qpos,
+                    self._data.qvel,
+                    self._jointIndices,
+                    self._velocityIndices,
+                    droneGlobalPosition,
+                    manipulatorGlobalPosition,
+                    qpos,
+                    qvel,
                 )
-            # sensorData = np.copy(self._data.sensordata)
-            sensorData = self._data.sensordata
+                sensorData = np.copy(self._data.sensordata)
 
             if timeDebug:
                 t0_1 = time.time()
@@ -300,7 +206,6 @@ class MujocoSimulation(threading.Thread):
             if timeDebug:
                 t0_3 = time.time()
 
-            # if self._swayControllerEnabled:
             robotSensorDataMessage.timestamp = currentTimestamp
             robotSensorDataMessage.timestep = self._model.opt.timestep
             robotSensorDataMessage.sensorValues = robotSensorValues
@@ -308,19 +213,11 @@ class MujocoSimulation(threading.Thread):
             robotSensorDataMessage.dronePosition = droneGlobalPosition
             robotSensorDataMessage.jointsPosition = qpos
             robotSensorDataMessage.jointsVelocity = qvel
-            robotSensorDataMessage.droneAcceleration = droneSensorValues["body_linacc"]
-            robotSensorDataMessage.armsHooks = self._armsHooks
-            robotSensorDataMessage.droneHooks = self._droneHooks
-            robotSensorDataMessage.robotComPos = self._manipCOMPos
-            robotSensorDataMessage.robotComVel = self._manipCOMVel
-            robotSensorDataMessage.robotComAcc = self._manipCOMAcc
-            robotSensorDataMessage.robotComJac = self._manipCOMJac
 
             if timeDebug:
                 t0_4 = time.time()
 
             self._droneController.setSensorData(sensorDataMessage)
-            # if self._swayControllerEnabled:
             self._swayController.setSensorData(robotSensorDataMessage)
             if debug:
                 print(f"[MujocoSimulation] sensorDataMessage: {sensorDataMessage}")
@@ -350,9 +247,9 @@ class MujocoSimulation(threading.Thread):
             if timeDebug:
                 t2 = time.time()
 
-            # Simulation step: timestep = 0.002s
-            # with self._dataLock:
-            mujoco.mj_step(self._model, self._data)
+            # Simulation step: timestep = 0.001s
+            with self._dataLock:
+                mujoco.mj_step(self._model, self._data)
             if not self._droneController._updateEvent.is_set():
                 self._droneController.setUpdateEvent()
             if not self._swayController._updateEvent.is_set():

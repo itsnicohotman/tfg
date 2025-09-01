@@ -58,12 +58,13 @@ class SwayControl(threading.Thread):
 
         # Inputs
         self._sensorData: RobotSensorData = None
-        self._currentArmsHookPositions = None
-        self._currentDroneHookPositions = None
-        self._robotComPos = np.zeros(3)
-        self._robotComVel = np.zeros(3)
-        self._robotComAcc = np.zeros(3)
-        self._robotComJac = np.zeros((3, 8))  # Jacobian of the CoM
+        self._posRobotCOM = np.zeros(3)
+        # self._currentArmsHookPositions = None
+        # self._currentDroneHookPositions = None
+        # self._velRobotCOM = np.zeros(3)
+        # self._accelRobotCOM = np.zeros(3)
+        # self._JRobotCOM = np.zeros((3, 8))  # Jacobian of the CoM
+        # self._JRobotCOMDot = np.zeros((3, 8))  # Jacobian derivative of the CoM
 
         # Outputs
         self._robotControlAction: RobotControlAction = RobotControlAction(
@@ -78,10 +79,7 @@ class SwayControl(threading.Thread):
         self._currentAngularVelocity = np.zeros(3)
         self._currentVelocity = np.zeros(3)
         self._currentTargetRobotPosition = np.zeros(3)
-        self._currentDroneAcceleration = np.zeros(3)
-        self._currentCableVectorAvg = np.zeros(3)
-        self._prevThetas = (0.0, 0.0)
-        self._prevDt = 0.0
+        self._prevDt = 0.001
 
         self._targetQPosition = np.zeros(8)  # Target joint positions
         self._qPosition = np.zeros(8)  # Current joint positions
@@ -90,14 +88,10 @@ class SwayControl(threading.Thread):
         self._qPositionRef = np.zeros(8)  # Reference joint positions
         self._robotControlAction.jointMotors = {}
         self._robotComError = np.zeros(3)
+        self._robotComPos = np.zeros(3)
+        self._manipPos = np.zeros(3)
 
         # Store for analysis
-        self._historyReferencePosition = []
-        self._historyCurrentPosition = []
-        self._historyReferenceVelocity = []
-        self._historyCurrentVelocity = []
-        self._historyReferenceAcceleration = []
-        self._historyCurrentAcceleration = []
         self._historyTime = []
         self._historyControlAction = []
         self._historyQPosition = []
@@ -105,6 +99,7 @@ class SwayControl(threading.Thread):
         self._historyQVelocity = []
         self._historyQVelocityReference = []
         self._historyRobotComPosError = []
+        self._historyPosManipError = []
 
         self._debugging = False
         self._timeDebugging = False
@@ -117,12 +112,11 @@ class SwayControl(threading.Thread):
 
         previousPosTimestamp = 0.0
         previousVelTimestamp = 0.0
-        previousQRefTimestamp = 0.0
         PERIOD_POS_CONTR = 0.005
         PERIOD_VEL_CONTR = 0.001
-        PERIOD_QREF_CONTR = 0.02
         posDt = 0
         velDt = 0
+        nullMotors = True
 
         nextTime = time.perf_counter()
         tStart = time.time()
@@ -136,52 +130,82 @@ class SwayControl(threading.Thread):
             tSinceStart = time.time() - tStart
 
             ###############################
-            # Calculate Shoulder pitch and roll references
+            # Set Robot's joints references
             ###############################
-            # if iteration == 1 or iteration % 20 == 0:
-            #     self._prevDt = self._currentTimestamp - previousQRefTimestamp
-            #     if self._prevDt <= 0:
-            #         self._prevDt = PERIOD_QREF_CONTR
-            #     qsp_ref, qsr_ref = self.computeShoulderReferences()
-            #     # print(
-            #     #     f"[SwayControl] Shoulder references: qsp_ref={qsp_ref:.3f}, qsr_ref={qsr_ref:.3f}"
-            #     # )
-            #     self._targetQPosition[1] = qsp_ref  # left_shoulder_pitch
-            #     self._targetQPosition[0] = qsr_ref  # left_shoulder_roll
-            #     self._targetQPosition[5] = qsp_ref  # right_shoulder_pitch
-            #     self._targetQPosition[4] = qsr_ref  # right_shoulder_roll
 
-            # For first testing, change references every 5 seconds
             if self._currentTimestamp < 5:
+                # 1) q4 from 0 to 90 degrees in both arms.
                 self._targetQPosition = np.array(
-                    [1.57, 0.0, 0.0, 0.0, -0.72, 0.0, 0.0, -0.5]
+                    [0.0, 0.0, 0.0, 1.57, 0.0, 0.0, 0.0, 1.57]
                 )
                 # print(f"[SwayControl] Target joint position: {self._targetQPosition}")
-            elif self._currentTimestamp < 10:
+            elif self._currentTimestamp < 6:
+                nullMotors = True
+                # print(f"[SwayControl] Stabilising. No reference set.")
+            elif self._currentTimestamp < 16:
+                # 2) q1 from 0 to 90 degrees in both arms.
                 self._targetQPosition = np.array(
-                    [1.57, 0.0, 0.3, 0.0, -0.72, 1, 0.0, 0.0]
+                    [1.57, 0.0, 0.0, 0.0, 1.57, 0.0, 0.0, 0.0]
+                )
+                nullMotors = False
+                # print(f"[SwayControl] Target joint position: {self._targetQPosition}")
+            elif self._currentTimestamp < 17:
+                nullMotors = True
+                # print(f"[SwayControl] Stabilising. No reference set.")
+            elif self._currentTimestamp < 27:
+                # 3) q4 from 0 to 90 degrees in left arm only.
+                self._targetQPosition = np.array(
+                    [0.0, 0.0, 0.0, 1.57, 0.0, 0.0, 0.0, 0.0]
+                )
+                nullMotors = False
+                # print(f"[SwayControl] Target joint position: {self._targetQPosition}")
+            elif self._currentTimestamp < 28:
+                nullMotors = True
+                # print(f"[SwayControl] Stabilising. No reference set.")
+            elif self._currentTimestamp < 38:
+                # 4) q1 from 0 to 90 degrees in left arm only.
+                self._targetQPosition = np.array(
+                    [1.57, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+                )
+                nullMotors = False
+                # print(f"[SwayControl] Target joint position: {self._targetQPosition}")
+            elif self._currentTimestamp < 39:
+                nullMotors = True
+                # print(f"[SwayControl] Stabilising. No reference set.")
+            elif self._currentTimestamp < 49:
+                # 5) q2 from 0 to 90 degrees in left arm. q2 from 0 to -90 degrees in right arm.
+                self._targetQPosition = np.array(
+                    [0.0, 1.57, 0.0, 0.0, 0.0, -1.57, 0.0, 0.0]
                 )
                 # print(f"[SwayControl] Target joint position: {self._targetQPosition}")
-            elif self._currentTimestamp < 15:
+            elif self._currentTimestamp < 50:
+                nullMotors = True
+                # print(f"[SwayControl] Stabilising. No reference set.")
+            elif self._currentTimestamp < 60:
+                # 6) q2 from 0 to 90 degrees in left arm only.
                 self._targetQPosition = np.array(
-                    [1.57, 0.6, 0.3, 0.85, -0.72, 1, 0.0, 0.5]
-                )
-            elif self._currentTimestamp < 20:
-                self._targetQPosition = np.array(
-                    [1.57, 0.6, 0.3, 0.85, -0.72, 1.57, 0.7, 0.0]
-                )
-                # print(f"[SwayControl] Target joint position: {self._targetQPosition}")
-            elif self._currentTimestamp < 25:
-                self._targetQPosition = np.array(
-                    [0.0, 0.6, 0.3, 0.85, 0.0, 1.57, 0.7, 0.0]
+                    [0.0, 1.57, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
                 )
                 # print(f"[SwayControl] Target joint position: {self._targetQPosition}")
-            else:
+            elif self._currentTimestamp < 61:
+                nullMotors = True
+                # print(f"[SwayControl] Stabilising. No reference set.")
+            elif self._currentTimestamp < 71:
+                self._targetQPosition = np.array(
+                    [1.57, 0.0, 0.0, 0.0, -1.57, 0.0, 0.0, 0.0]
+                )
+                # print(f"[SwayControl] Target joint position: {self._targetQPosition}")
+            elif self._currentTimestamp < 72:
+                nullMotors = True
+                # print(f"[SwayControl] Stabilising. No reference set.")
+            elif self._currentTimestamp < 82:
+                time.sleep(10)
                 self._shutdownEvent.set()
 
             t1 = time.time()
 
             self._robotComError = self._currentTargetRobotPosition - self._robotComPos
+            self._robotBaseError = self._currentTargetRobotPosition - self._manipPos
 
             if iteration == 1 or iteration % 5 == 0:
                 targetQPosition = self._refFilter.step(self._targetQPosition)
@@ -206,6 +230,8 @@ class SwayControl(threading.Thread):
 
             # Update control action
             jointMotors = {}
+            if nullMotors:
+                torque = np.zeros(8)
             for i in range(8):
                 jointNames = [
                     "left_shoulder_roll",
@@ -233,6 +259,7 @@ class SwayControl(threading.Thread):
             self._historyQVelocityReference.append(qdReference.copy())
             self._historyControlAction.append(torque.copy())
             self._historyRobotComPosError.append(self._robotComError.copy())
+            self._historyPosManipError.append(self._robotBaseError.copy())
 
             elapsedCycle = time.time() - t0
 
@@ -285,32 +312,30 @@ class SwayControl(threading.Thread):
         if self._sensorData is not None:
             with self._sensorLock:
                 sensorData = self._sensorData
-            self._previousTimestamp = self._currentTimestamp
-            self._currentTimestamp = sensorData.timestamp
-            self._timestep = sensorData.timestep
-            self._currentPosition = np.array(sensorData.manipulatorPosition)
-            self._currentAcceleration = np.array(
-                sensorData.sensorValues["robot_linacc"]
-            )
-            self._currentAngularVelocity = np.array(
-                sensorData.sensorValues["robot_gyro"]
-            )
-            self._currentVelocity = np.array(sensorData.sensorValues["robot_vel"])
-            self._currentTargetRobotPosition = np.array(
-                sensorData.dronePosition
-                - [0.0, 0.0, 0.6245]  # Adjusted for cables and robot base offset
-            )
-            self._qPosition = sensorData.jointsPosition
-            self._qVelocity = sensorData.jointsVelocity
-            self._currentDroneAcceleration = sensorData.droneAcceleration
-            self._currentArmsHookPositions = sensorData.armsHooks
-            self._currentDroneHookPositions = sensorData.droneHooks
-            self._robotComPos = sensorData.robotComPos
-            self._robotComVel = sensorData.robotComVel
-            self._robotComAcc = sensorData.robotComAcc
-            self._robotComJac = sensorData.robotComJac
-            self._robotComPosError = (
-                self._currentTargetRobotPosition - self._robotComPos
+                self._previousTimestamp = self._currentTimestamp
+                self._currentTimestamp = np.copy(sensorData.timestamp)
+                self._timestep = np.copy(sensorData.timestep)
+                self._currentPosition = np.array(
+                    sensorData.manipulatorPosition, copy=True
+                )
+                self._currentAcceleration = np.array(
+                    sensorData.sensorValues["robot_linacc"], copy=True
+                )
+                self._currentAngularVelocity = np.array(
+                    sensorData.sensorValues["robot_gyro"], copy=True
+                )
+                self._currentVelocity = np.array(
+                    sensorData.sensorValues["robot_vel"], copy=True
+                )
+                self._currentTargetRobotPosition = np.array(
+                    sensorData.dronePosition - [0.0, 0.0, 0.6245],
+                    copy=True,  # Adjusted for cables and robot base offset
+                )
+                self._qPosition = np.copy(sensorData.jointsPosition)
+                self._qVelocityPrev = self._qVelocity.copy()
+                self._qVelocity = np.copy(sensorData.jointsVelocity)
+            self._posRobotCOMError = (
+                self._currentTargetRobotPosition - self._posRobotCOM
             )
 
             if self._currentTargetRobotPosition[0] is None:
@@ -321,114 +346,6 @@ class SwayControl(threading.Thread):
                 self._currentTargetRobotPosition[2] = self._currentPosition[2]
         else:
             pass
-
-    def computeShoulderReferences(self):
-        """
-        Calculates shoulder pitch (qsp) and roll (qsr) references from the drone's acceleration and cable vector.
-        """
-
-        Kp = 0.6
-        Kd = 0.3
-
-        g = 9.81
-        ax, ay = self._currentDroneAcceleration[0], self._currentDroneAcceleration[1]
-
-        # feedforward: compensar aceleración del dron
-        pitchFF = -np.arctan2(ax, g)
-        rollFF = -np.arctan2(ay, g)
-
-        # ángulos de la cuerda respecto a z
-        unitVectors, self._currentCableVectorAvg = self.computeCableVectors(
-            armsHooks=self._currentArmsHookPositions,
-            droneHooks=self._currentDroneHookPositions,
-        )
-        u = self._currentCableVectorAvg / (np.linalg.norm(self._currentCableVectorAvg))
-        thetaX = np.arctan2(u[0], u[2])  # inclinación en x
-        thetaY = np.arctan2(u[1], u[2])  # inclinación en y
-
-        # derivadas (aprox)
-        dthetaX = (thetaX - self._prevThetas[0]) / (self._prevDt)
-        dthetaY = (thetaY - self._prevThetas[1]) / (self._prevDt)
-
-        self._prevThetas = (thetaX, thetaY)
-
-        # Calculate desired load CoM acceleration
-        aCOMdes = -(Kp / self._mass) * np.array([thetaX, thetaY]) - (
-            Kd / self._mass
-        ) * np.array([dthetaX, dthetaY])
-        if aCOMdes[0] > 1.0:
-            aCOMdes[0] = 1.0
-        if aCOMdes[1] > 1.0:
-            aCOMdes[1] = 1.0
-
-        Jdot_qDot = self._velocityCOM - self._JCOM @ self._qVelocity
-
-        # Solving optimization problem minimum square error through QP.
-        # min || JCOM * qdd + Jdot_qDot - aCOMdes ||^2
-        lambdaReg = 1e-3
-        H = 2 * (
-            self._JCOM.T @ self._JCOM + lambdaReg * np.eye(8)
-        )  # Regularization term
-        f = 2 * (self._JCOM.T @ Jdot_qDot - self._JCOM.T @ aCOMdes)
-        # No constraints
-        A_eq = None
-        b_eq = None
-        A_ineq = None
-        b_ineq = None
-
-        ddq_max = np.ones(self._JCOM.shape[1]) * 1.0
-        ddq_min = -ddq_max
-
-        qdd_opt = solve_qp(
-            H, f, A_ineq, b_ineq, A_eq, b_eq, lb=ddq_min, ub=ddq_max, solver="cvxopt"
-        )
-        if qdd_opt is None:
-            print("[QP] WARNING: No solution found, fallback to zeros")
-            qdd_opt = np.zeros(self._JCOM.shape[1])
-
-        qPosRef, qVelRef = self.integrateStates(qdd_opt)
-        qsp_ref = qPosRef[1]  # left_shoulder_pitch
-        qsr_ref = qPosRef[0]  # left_shoulder_roll
-        # control feedback: PD sobre ángulo de la cuerda
-        # qsp_ref = pitchFF - Kp * thetaX - Kd * dthetaX
-        # qsr_ref = rollFF - Kp * thetaY - Kd * dthetaY
-
-        return qsp_ref, qsr_ref
-
-    def integrateStates(self, qdd):
-        dt = 0.02
-
-        # Actualización de posición con término de aceleración
-        self._qPositionRef = (
-            self._qPositionRef + self._qVelocityRef * dt + 0.5 * qdd * dt**2
-        )
-
-        # Luego actualizar velocidad
-        self._qVelocityRef = self._qVelocityRef + qdd * dt
-
-        return self._qPositionRef, self._qVelocityRef
-
-    def computeCableVectors(self, armsHooks, droneHooks):
-        """
-        Calculates cable vectors in global coordinates.
-        armsHooks: np.array shape (N,3)
-        droneHooks: np.array shape (N,3)
-        return:
-        unit_vectors: np.array shape (N,3) with the normalized unit vectors.
-        u_avg: np.array shape (3,) average unitary vector.
-        """
-        diffs = armsHooks - droneHooks
-        norms = np.linalg.norm(diffs, axis=1, keepdims=True)
-        unitVectors = diffs / norms
-
-        # average and normalize
-        uMean = np.mean(unitVectors, axis=0)
-        uAvg = uMean / np.linalg.norm(uMean)
-
-        # print("[SwayControl] Unit Vectors:", unitVectors)
-        # print("[SwayControl] Average Unit Vector:", uAvg)
-
-        return unitVectors, uAvg
 
     # Accessed from MujocoSimulation thread.
     def setSensorData(self, sensorData: RobotSensorData):
@@ -459,7 +376,8 @@ class SwayControl(threading.Thread):
         q_vel = np.array(self._historyQVelocity)
         q_vel_ref = np.array(self._historyQVelocityReference)
         control = np.array(self._historyControlAction)
-        robotPosError = np.array(self._historyRobotComPosError)
+        robotCOMPosError = np.array(self._historyRobotComPosError)
+        robotPosError = np.array(self._historyPosManipError)
 
         # Names and groups of joints
         jointNames = [
@@ -680,10 +598,34 @@ class SwayControl(threading.Thread):
         )
         plt.close()
 
-        # --- Robot oscillations ---
-        oscillationsNames = ["Oscillations in X axis", "Oscillations in Y axis"]
-        oscillationsLabels = ["x_oscillations", "y_oscillations"]
+        # --- Robot COM oscillations ---
+        oscillationsNames = [
+            "Oscillations in X axis",
+            "Oscillations in Y axis",
+            "Oscillations in Z axis",
+        ]
+        oscillationsLabels = ["x_oscillations", "y_oscillations", "z_oscillations"]
         for i in range(2):
+            plt.figure()
+            plt.plot(
+                time,
+                robotCOMPosError[:, i],
+                label=pretty_name(oscillationsLabels[i]),
+            )
+            plt.xlabel("Time [s]")
+            plt.ylabel("Distance [m]")
+            plt.title(oscillationsNames[i])
+            plt.legend()
+            plt.grid(True)
+            plt.savefig(
+                os.path.join(dir_sway, f"COM_{oscillationsLabels[i]}.png"),
+                facecolor="w",
+                edgecolor="w",
+            )
+            plt.close()
+
+        # --- Robot base oscillations ---
+        for i in range(3):
             plt.figure()
             plt.plot(
                 time,
@@ -696,7 +638,7 @@ class SwayControl(threading.Thread):
             plt.legend()
             plt.grid(True)
             plt.savefig(
-                os.path.join(dir_sway, f"{oscillationsLabels[i]}.png"),
+                os.path.join(dir_sway, f"Base_{oscillationsLabels[i]}.png"),
                 facecolor="w",
                 edgecolor="w",
             )
