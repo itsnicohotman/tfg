@@ -29,11 +29,13 @@ class MujocoSimulation(threading.Thread):
         droneController: DroneControl,
         swayController: SwayControl,
         swayControllerEnabled: bool,
+        qCombination: int,
     ):
         super().__init__()  # Start thread
         self._droneController = droneController
         self._swayController = swayController
         self._swayControllerEnabled = swayControllerEnabled
+        self._qCombination = qCombination
         match model:
             case "drone":
                 MODEL_PATH = "/home/nicolas/tfg/mujoco/model/drone/Model_GRVC_Drone.xml"
@@ -83,69 +85,6 @@ class MujocoSimulation(threading.Thread):
         }
 
         if not self._onlyDrone:
-            hookNamesByModel = {
-                "1 cable": [
-                    "drone_side_center",
-                    "arms_side_center",
-                ],
-                "2 cable": [
-                    "drone_side_right",
-                    "drone_side_left",
-                    "arms_side_right",
-                    "arms_side_left",
-                ],
-                "4 cable": [
-                    "drone_side_right",
-                    "drone_side_left",
-                    "drone_side_back",
-                    "drone_side_front",
-                    "arms_side_right",
-                    "arms_side_left",
-                    "arms_side_back",
-                    "arms_side_front",
-                ],
-            }
-
-            self._hookSiteNamesIDs = {}
-            if model in hookNamesByModel:
-                for name in hookNamesByModel[model]:
-                    sid = mujoco.mj_name2id(self._model, mujoco.mjtObj.mjOBJ_SITE, name)
-                    if sid == -1:
-                        raise RuntimeError(f"Site {name} not found in model.")
-                    self._hookSiteNamesIDs[name] = sid
-            self._hookSiteNames = list(self._hookSiteNamesIDs.keys())
-            self._hookSiteIds = np.array(
-                list(self._hookSiteNamesIDs.values()), dtype=np.int32
-            )
-            hook_pairs = [
-                ("drone_side_center", "arms_side_center"),
-                ("drone_side_right", "arms_side_right"),
-                ("drone_side_left", "arms_side_left"),
-                ("drone_side_back", "arms_side_back"),
-                ("drone_side_front", "arms_side_front"),
-            ]
-
-            self._droneHookIds = []
-            self._armsHookIds = []
-
-            for drone_name, arm_name in hook_pairs:
-                if (
-                    drone_name in self._hookSiteNamesIDs
-                    and arm_name in self._hookSiteNamesIDs
-                ):
-                    self._droneHookIds.append(self._hookSiteNamesIDs[drone_name])
-                    self._armsHookIds.append(self._hookSiteNamesIDs[arm_name])
-
-            self._droneHookIds = np.array(self._droneHookIds, dtype=np.int32)
-            self._armsHookIds = np.array(self._armsHookIds, dtype=np.int32)
-
-            self._droneHooks = np.zeros(
-                (len(self._droneHookIds), 3), dtype=np.float64
-            )  # (nd,3)
-            self._armsHooks = np.zeros(
-                (len(self._armsHookIds), 3), dtype=np.float64
-            )  # (na,3)
-
             self._licasJoints = ["q11", "q12", "q13", "q14", "q21", "q22", "q23", "q24"]
             self._jointIndices = np.array(
                 [self._model.joint(name).qposadr for name in self._licasJoints]
@@ -154,14 +93,6 @@ class MujocoSimulation(threading.Thread):
                 [self._model.joint(name).dofadr for name in self._licasJoints]
             )
         else:
-            self._droneHooks = np.zeros((0, 3), dtype=np.float64)  # (0,3)
-            self._armsHooks = np.zeros((0, 3), dtype=np.float64)  # (0,3)
-            # self._jointIndices = np.array([], dtype=np.int32)
-            # self._velocityIndices = np.array([], dtype=np.int32)
-            self._droneHookIds = np.array([], dtype=np.int32)
-            self._armsHookIds = np.array([], dtype=np.int32)
-            # self._droneHooks = np.zeros((0, 3), dtype=np.float64).reshape(0, 3)  # (0,3)
-            # self._armsHooks = np.zeros((0, 3), dtype=np.float64).reshape(0, 3)  # (0,3)
             self._jointIndices = np.zeros((0, 1), dtype=np.int32).reshape(0, 1)  # (0,1)
             self._velocityIndices = np.zeros((0, 1), dtype=np.int32).reshape(
                 0, 1
@@ -234,14 +165,10 @@ class MujocoSimulation(threading.Thread):
                     self._data.qvel,
                     self._jointIndices,
                     self._velocityIndices,
-                    self._droneHookIds,
-                    self._armsHookIds,
                     droneGlobalPosition,
                     manipulatorGlobalPosition,
                     qpos,
                     qvel,
-                    self._droneHooks,
-                    self._armsHooks,
                 )
                 sensorData = np.copy(self._data.sensordata)
 
@@ -279,9 +206,7 @@ class MujocoSimulation(threading.Thread):
                     dronePosition=droneGlobalPosition,
                     jointsPosition=qpos,
                     jointsVelocity=qvel,
-                    droneAcceleration=droneSensorValues["body_linacc"],
-                    armsHooks=self._armsHooks,
-                    droneHooks=self._droneHooks,
+                    qCombinationCase=self._qCombination,
                 )
 
             if timeDebug:
@@ -404,6 +329,7 @@ class MujocoSimulation(threading.Thread):
         """Launch passive viewer on a separate thread."""
         n = 0
         periodSum = 0
+        sleepTimeSum = 0
         PERIOD = 0.01
         with mujoco.viewer.launch_passive(
             self._model, self._data, show_left_ui=False, show_right_ui=True
@@ -420,8 +346,10 @@ class MujocoSimulation(threading.Thread):
                             print("[Viewer Thread] Data locked.")
                     n += 1
                     tf = time.perf_counter()
-                    periodSum += tf - ts
-                    sleepTime = PERIOD - (tf - ts)
+                    cycleDuration = tf - ts
+                    periodSum += cycleDuration
+                    sleepTime = PERIOD - (cycleDuration)
+                    sleepTimeSum += sleepTime
                     if sleepTime > 0:
                         time.sleep(sleepTime)  # FPS control (100 Hz)
                 except Exception as e:
@@ -429,7 +357,7 @@ class MujocoSimulation(threading.Thread):
                     break
 
             self._viewer.close()
-        avgPeriod = periodSum / n
+        avgPeriod = (periodSum + sleepTimeSum) / n
         avgFrequency = 1 / avgPeriod
         print(
             f"[MujocViewerThread] Average Frequency: {avgFrequency}, Number of Syncs: {n}"

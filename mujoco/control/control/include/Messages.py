@@ -41,9 +41,10 @@ class RobotSensorData:
     jointsVelocity: list[
         float, float, float, float, float, float, float, float
     ]  # Joints velocity (qvel)
-    droneAcceleration: list[float, float, float]  # Drone's linear acceleration
-    armsHooks: list  # List with anchor points on the arms' side
-    droneHooks: list  # List with anchor points on the drone' side
+    # droneAcceleration: list[float, float, float]  # Drone's linear acceleration
+    # armsHooks: list  # List with anchor points on the arms' side
+    # droneHooks: list  # List with anchor points on the drone' side
+    qCombinationCase: int
 
 
 @dataclass

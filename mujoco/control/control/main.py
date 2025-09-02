@@ -26,6 +26,19 @@ def main():
             swayControllerEnabled = sys.argv[2].lower() in ["true", "1", "yes"]
         else:
             swayControllerEnabled = False
+
+        if len(sys.argv) > 3:
+            try:
+                combination = int(sys.argv[3])
+                if not (1 <= combination <= 7):
+                    raise ValueError
+            except ValueError:
+                print(
+                    "❌ Error: The third argument must be an integer number between 1 and 7."
+                )
+                sys.exit(1)
+        else:
+            combination = 0
     else:
         model = "drone"
         swayControllerEnabled = False
@@ -59,6 +72,7 @@ def main():
         droneController,
         swayController=swayController,
         swayControllerEnabled=swayControllerEnabled,
+        qCombination=combination,
     )
     mujocoSim.start()
     droneController.start()

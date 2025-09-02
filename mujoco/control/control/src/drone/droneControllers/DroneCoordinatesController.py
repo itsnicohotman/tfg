@@ -382,6 +382,36 @@ class CoordinatesController(threading.Thread):
                 f"[Drone Coordinates Controller] {labelsCart[i]}_PositionControl.png saved"
             )
 
+        # --- Coordinate Position control (3D trajectory) ---
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection="3d")
+        ax.plot(
+            historyPosition[:, 0],
+            historyPosition[:, 1],
+            historyPosition[:, 2],
+        )
+        ax.set_title(f" 3D trajectory during position control")
+        ax.set_xlabel("X [m]")
+        ax.set_ylabel("Y [m]")
+        ax.set_zlabel("Z [m]")
+        ax.legend()
+        plt.savefig(os.path.join(output_dir, f"Trajectory_3D_PositionControl.png"))
+        print(f"[Drone Coordinates Controller] Trajectory_3D_PositionControl.png saved")
+
+        # --- Coordinate Position control (2D trajectory) ---
+        plt.figure()
+        plt.clf()
+        plt.plot(
+            historyPosition[:, 0],
+            historyPosition[:, 1],
+        )
+        plt.title(f"2D trajectory during position control")
+        plt.xlabel("Time [s]")
+        plt.ylabel("Distance [m]")
+        plt.legend()
+        plt.savefig(os.path.join(output_dir, f"Trajectory_2D_PositionControl.png"))
+        print(f"[Drone Coordinates Controller] Trajectory_2D_PositionControl.png saved")
+
         # --- Coordinate Velocity control ---
         for i in range(2):
             plt.figure()
