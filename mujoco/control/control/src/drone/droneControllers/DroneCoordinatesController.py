@@ -45,13 +45,13 @@ class CoordinatesController(threading.Thread):
 
         # Velocity -> Acceleration PID Controller
         vKp = np.array(
-            [10, 10, 0.0], dtype=np.float64
+            [5, 5, 0.0], dtype=np.float64
         )  # Kp for x, y velocities [10 10 0]
         vKi = np.array([5, 5, 0.0], dtype=np.float64)  # Ki for x, y velocities [5 5 0]
         vKd = np.array(
-            [0.0085, 0.0085, 0.0], dtype=np.float64
+            [0.085, 0.085, 0.0], dtype=np.float64
         )  # Kd for x, y velocities [0.0085 0.0085 0]
-        self._MAX_ACCEL = 1.0
+        self._MAX_ACCEL = 0.5
         self._velocityPID = PIDController(
             kp=vKp,
             ki=vKi,
