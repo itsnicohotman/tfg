@@ -1,0 +1,133 @@
+<mujoco model="Dual-arm manipulator">
+
+    <include file="/home/nicolas/tfg/mujoco/assets/dualarm/assets.xml" />
+    <default>
+        <default class="sensor_site">
+            <site group="3" />
+        </default>
+        <default class="joint_pos_actuator">
+            <position kp="1" kv="1" ctrlrange="-1.57 1.57" forcerange="-4 4" timeconst="0" />
+            <default class="shoulder_roll_actuator">
+                <position ctrlrange="-0.5236 1.57" />
+            </default>
+            <default class="elbow_pitch_actuator">
+                <position ctrlrange="-2.0944 2.0944" />
+            </default>
+            <default class="claw_actuator">
+                <position ctrlrange="-0.4799 1.57" />
+            </default>
+        </default>
+        <default class="joint_torque_actuator">
+            <motor forcerange="0.2 2.3" gear="1" />
+        </default>
+        <default class="translation">
+            <position kp="9" dampratio="0.1" ctrlrange="-2.5 2.55" />
+        </default>
+        <default class="rotation">
+            <position kp="1" dampratio="0.1" ctrlrange="-1.57 1.57" />
+        </default>
+    <joint armature="1e-3" damping="1e-3" stiffness="1e-3" actuatorgravcomp="true" />
+    </default>
+
+    <worldbody>
+        <light name="spotlight" mode="targetbodycom" target="manipulator" pos="0.0 -0.01 0.02" />
+        <body name="manipulator" pos="0.0 10.0 3.0" euler="0 0 180">
+            <freejoint />
+            <inertial mass="1.019" diaginertia="0.174 0.174 1e-8" pos="0.0 6.59e-5 9.01e-5" />
+            <site name="right_reference" type="box" size="0.05 0.05 0.1" rgba="0 1 0 1" pos="1.4 2.5 -3.14" euler="0 0 180" group="4" />
+            <site name="left_reference" type="box" size="0.05 0.05 0.1" rgba="0 0 1 1" pos="-1.4 2.5 -3.14" group="4" />
+            <site name="left_elbow_reference" type="box" size="0.05 0.05 0.15" rgba="0 0 1 1" pos="-1.48 0.0425 -2.765" group="4" />
+            <site name="right_elbow_reference" type="box" size="0.05 0.05 0.15" rgba="0 0 1 1" pos="1.46 0.0425 -2.765" group="4" />
+            <body name="base">
+                <include file="base.xml" />  
+                <body name="right_arm">
+                    <include file="arm_right.xml" />
+                </body>
+                <body name="left_arm">
+                    <include file="arm_left.xml" />
+                </body>    
+            </body>
+        </body>
+    </worldbody>
+
+    <actuator>
+        <position name="right x" site="right_tcp" refsite="right_reference" gear="1 0 0 0 0 0" class="translation" group="1" />
+        <position name="right y" site="right_tcp" refsite="right_reference" gear="0 1 0 0 0 0" class="translation" group="1" />
+        <position name="right z" site="right_tcp" refsite="right_reference" gear="0 0 1 0 0 0" class="translation" group="1" />
+        <position name="right orientation" joint="right_arm_claw_roll_joint" class="rotation" group="1" />
+
+        <position name="left x" site="left_tcp" refsite="left_reference" gear="1 0 0 0 0 0" class="translation" group="1" />
+        <position name="left y" site="left_tcp" refsite="left_reference" gear="0 1 0 0 0 0" class="translation" group="1" />
+        <position name="left z" site="left_tcp" refsite="left_reference" gear="0 0 1 0 0 0" class="translation" group="1" />
+        <position name="left orientation" joint="left_arm_claw_roll_joint" class="rotation" group="1" />
+
+        <position name="right claw" joint="right_arm_claw_joint" class="claw_actuator" group="2" />
+        <position name="left claw" joint="left_arm_claw_joint" class="claw_actuator" group="2" />
+
+        <!-- <position name="right elbow" site="right_elbow_site" refsite="right_elbow_reference" gear="0 0 1 0 0 0" class="translation" group="5" />
+        <position name="left elbow" site="left_elbow_site" refsite="left_elbow_reference" gear="0 0 1 0 0 0" class="translation" group="5" />
+    
+        <position name="pos right shoulder pitch" joint="right_arm_shoulder_pitch_joint" class="joint_pos_actuator" group="3" />
+        <position name="pos right shoulder yaw" joint="right_arm_shoulder_yaw_joint" class="joint_pos_actuator" group="3" />
+        <position name="pos right shoulder roll" joint="right_arm_shoulder_roll_joint" class="shoulder_roll_actuator" group="3" />
+        <position name="pos right elbow" joint="right_arm_elbow_pitch_joint" class="elbow_pitch_actuator" group="3" />
+        <position name="pos right claw roll" joint="right_arm_claw_roll_joint" class="rotation" group="3" />
+
+        <position name="pos left shoulder pitch" joint="left_arm_shoulder_pitch_joint" class="joint_pos_actuator" group="3" />
+        <position name="pos left shoulder yaw" joint="left_arm_shoulder_yaw_joint" class="joint_pos_actuator" group="3" />
+        <position name="pos left shoulder roll" joint="left_arm_shoulder_roll_joint" class="shoulder_roll_actuator" group="3" />
+        <position name="pos left shoulder" joint="left_arm_elbow_pitch_joint" class="elbow_pitch_actuator" group="3" />
+        <position name="pos left claw roll" joint="left_arm_claw_roll_joint" class="rotation" group="3" />
+
+        <motor name="torque right shoulder pitch" joint="right_arm_shoulder_pitch_joint" class="joint_torque_actuator" group="4" />
+        <motor name="torque right shoulder yaw" joint="right_arm_shoulder_yaw_joint" class="joint_torque_actuator" group="4" />
+        <motor name="torque right shoulder roll" joint="right_arm_shoulder_roll_joint" class="joint_torque_actuator" group="4" />
+        <motor name="torque right elbow pitch " joint="right_arm_elbow_pitch_joint" class="joint_torque_actuator" group="4" />
+        <motor name="torque right claw roll" joint="right_arm_claw_roll_joint" class="joint_torque_actuator" group="4" />
+
+        <motor name="torque left shoulder pitch" joint="left_arm_shoulder_pitch_joint" class="joint_torque_actuator" group="4" />
+        <motor name="torque left shoulder yaw" joint="left_arm_shoulder_yaw_joint" class="joint_torque_actuator" group="4" />
+        <motor name="torque left shoulder roll" joint="left_arm_shoulder_roll_joint" class="joint_torque_actuator" group="4" />
+        <motor name="torque left elbow pitch " joint="left_arm_elbow_pitch_joint" class="joint_torque_actuator" group="4" />
+        <motor name="torque left claw roll" joint="left_arm_claw_roll_joint" class="joint_torque_actuator" group="4" />
+
+        <motor name="torque right claw" joint="right_arm_claw_joint" class="joint_torque_actuator" group="4" />
+        <motor name="torque left claw" joint="left_arm_claw_joint" class="joint_torque_actuator" group="4" /> -->
+    </actuator>
+
+    <sensor>
+        <touch name="base_cables_contact_touch" site="base_cables_contact" />
+        <force name="base_cables_contact_force" site="base_cables_contact" />
+        <torque name="base_cables_contact_torque" site="base_cables_contact" />
+        <accelerometer name="manipulator_base_acceleration" site="base_imu" />
+        <velocimeter name="manipulator_base_velocity" site="base_imu" />
+        <gyro name="manipulator_base_orientation" site="base_imu" />
+        <subtreecom name="manipulator_center_of_mass" body="manipulator" />
+        <subtreelinvel name="manipulator_linear_velocity" body="manipulator" />
+        <subtreeangmom name="manipulator_angular_momentum" body="manipulator" />
+
+        <!-- <jointpos name="left_shoulder_pitch" joint="left_arm_shoulder_pitch_joint" />
+        <jointpos name="left_shoulder_yaw" joint="left_arm_shoulder_yaw_joint" />
+        <jointpos name="left_shoulder_roll" joint="left_arm_shoulder_roll_joint" />
+        <jointpos name="left_elbow_pitch" joint="left_arm_elbow_pitch_joint" />
+        <jointpos name="left_wrist_roll" joint="left_arm_claw_roll_joint"/>
+        <jointpos name="left_claw" joint="left_arm_claw_joint" />
+        <jointpos name="right_shoulder_pitch" joint="right_arm_shoulder_pitch_joint" />
+        <jointpos name="right_shoulder_yaw" joint="right_arm_shoulder_yaw_joint" />
+        <jointpos name="right_shoulder_roll" joint="right_arm_shoulder_roll_joint" />
+        <jointpos name="right_elbow_pitch" joint="right_arm_elbow_pitch_joint" />
+        <jointpos name="right_wrist_roll" joint="right_arm_claw_roll_joint"/>
+        <jointpos name="right_claw" joint="right_arm_claw_joint" />
+
+        <jointactuatorfrc name="left_shoulder_pitch_actfrc" joint="left_arm_shoulder_pitch_joint" />
+        <jointactuatorfrc name="left_shoulder_yaw_actfrc" joint="left_arm_shoulder_yaw_joint" />
+        <jointactuatorfrc name="left_shoulder_roll_actfrc" joint="left_arm_shoulder_roll_joint" />
+        <jointactuatorfrc name="left_elbow_pitch_actfrc" joint="left_arm_elbow_pitch_joint" />
+        <jointactuatorfrc name="left_claw_roll_actfrc" joint="left_arm_claw_joint" />
+        <jointactuatorfrc name="right_shoulder_pitch_actfrc" joint="right_arm_shoulder_pitch_joint" />
+        <jointactuatorfrc name="right_shoulder_yaw_actfrc" joint="right_arm_shoulder_yaw_joint" />
+        <jointactuatorfrc name="right_shoulder_roll_actfrc" joint="right_arm_shoulder_roll_joint" />
+        <jointactuatorfrc name="right_elbow_pitch_actfrc" joint="right_arm_elbow_pitch_joint" />
+        <jointactuatorfrc name="right_claw_roll_actfrc" joint="right_arm_claw_joint" /> -->
+    </sensor>
+</mujoco>

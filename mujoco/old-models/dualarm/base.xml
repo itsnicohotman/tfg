@@ -1,0 +1,11 @@
+<mujoco model="base_manipulator">
+  <body name="link_base" pos="0.0 0.0 0.0">
+    <geom class="visual_link" type="mesh" mesh="base_mesh" />
+    <geom class="collision" type="mesh" mesh="base_mesh" />
+    <inertial mass="0.2067" pos="-7.01e-09 1.8e-10 4.022573e-05" diaginertia="0.001336 0.001332 0.000082" />
+
+    <site name="base_cables_contact" class="sensor_site" type="cylinder" size="0.03 1.0" rgba="0 0 1 1" pos="0.0 0.0 0.5" euler="0 90 0" />
+    <site name="base_imu" class="sensor_site" type="box" size="0.1 0.1 0.1" rgba="1 0 0 1" pos="0.0 0.0 0.0" />
+    <site name="base_bar_center" type="sphere" size="0.005" pos="0.0 0.0 0.0" />
+  </body>
+</mujoco>

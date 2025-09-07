@@ -1,0 +1,152 @@
+<!-- Copyright 2025 Nicolás Víctor Hofmann Nieto
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+This file is based on Skydio's X2 model curated by Google Deepmind and 
+offered in MuJoCo's menagerie.
+It has been modified by Nicolás Víctor Hofmann Nieto on April 19, 2025.
+Modifications include: addition of a landing gear and a bar hanging
+through two cables from a platform fix to the drone's base. 
+ -->
+
+<mujoco model="drone">
+
+
+  <extension>
+    <plugin plugin="mujoco.elasticity.cable" />
+  </extension>
+  <size memory="200M" />
+
+  <default>
+    <default class="x2">
+      <geom mass="0" fluidshape="ellipsoid" fluidcoef="0.5 0.25 0.75 0.75 0.75"/>
+      <motor ctrlrange="-50 50" />
+      <mesh scale="0.1 0.1 0.1" />
+      <default class="visual">
+        <geom group="2" type="mesh" contype="0" conaffinity="0" />
+        <default class="foot_visual">
+          <geom type="cylinder" rgba="1 1 1 1" mass="0" group="2" contype="0" conaffinity="0" />
+        </default>
+      </default>
+      <default class="drone_collision">
+        <geom group="3" type="box" fluidcoef="0 0 0 0 0"/>
+        <default class="rotor">
+          <geom type="ellipsoid" size="1.3 1.3 .1" />
+        </default>
+      </default>
+      <site group="5" />
+    </default>
+  </default>
+
+  <asset>
+    <texture type="2d" file="/home/nicolas/tfg/mujoco/assets/drone/X2_lowpoly_texture_SpinningProps_1024.png" />
+    <material name="phong3SG" texture="X2_lowpoly_texture_SpinningProps_1024" />
+    <material name="invisible" rgba="1 0 0 0" />
+    <mesh class="x2" file="/home/nicolas/tfg/mujoco/assets/drone/X2_lowpoly.obj" />
+  </asset>
+
+  <worldbody>
+    <light name="spotlight_drone" mode="targetbodycom" target="x2" pos="0.0 -1.0 2.0" />
+<!--     <light name="spotlight_cables" mode="targetbodycom" target="platform_cables" pos="0.0 -0.01 0.02" />
+ -->    <body name="x2" pos="9.0 0.0 5.09" euler="0 0 0" childclass="x2">
+      <!-- <freejoint /> -->
+<!--       <joint name="drone_roll" type="hinge" axis="1 0 0"/>
+ -->      <joint name="drone_pitch" type="hinge" axis="0 1 0"/>
+<!--       <joint name="drone_yaw" type="hinge" axis="0 0 1"/>
+ -->
+      <camera name="track" pos="-1 0 .5" xyaxes="0 -1 0 1 0 2" mode="trackcom"/>
+      <site name="imu" pos="0 0 .2" euler="0 0 180"/>
+      <geom material="phong3SG" mesh="X2_lowpoly" class="visual" quat="0 0 1 1" fluidcoef="0 0 0 0 0"/>
+      <geom class="drone_collision" size=".6 .27 .2" pos=".4 0 .2"/>
+      <geom class="drone_collision" size=".6 .27 .2" pos=".4 0 .6"/>
+      <geom class="drone_collision" size=".5 .27 .2" pos="-.7 0 .65"/>
+      <geom class="drone_collision" size=".23 .17 .1" pos="-1.37 .08 .65" quat="1 0 0 1"/>
+      <geom name="rotor1" class="rotor" pos="-1.4 -1.8 .5" mass="1"/>
+      <geom name="rotor2" class="rotor" pos="-1.4 1.8 .5" mass="1"/>
+      <geom name="rotor3" class="rotor" pos="1.4 1.8 .8" mass="1"/>
+      <geom name="rotor4" class="rotor" pos="1.4 -1.8 .8" mass="1"/>
+      <geom name="drag_body" fluidshape="ellipsoid" size="1.6 0.4 0.2" pos="0.0 0.0 0.2" type="ellipsoid" mass="1.3" class="visual" material="invisible" />
+      <site name="thrust1" pos="-1.4 -1.8 .5"/>
+      <site name="thrust2" pos="-1.4 1.8 .5"/>
+      <site name="thrust3" pos="1.4 1.8 .8"/>
+      <site name="thrust4" pos="1.4 -1.8 .8"/>
+
+      <body name="landing_gear">
+          <body name="platform_cables" pos="0.4 0.0 -0.07" euler="-90 0 90">
+            <include file="cable.xml" />   
+
+            <body name="left_foot" euler="-90 -90 0">
+              <joint name="lf_joint" type="hinge" axis="1 0 0" pos="0.0 0.45 0.0" range="0 75" />
+              <geom name="lf_v1_visu" class="foot_visual" size="0.05 0.5" pos="0.65 0.55 -0.45" euler="15 -15 0" />
+              <geom name="lf_v2_visu" class="foot_visual" size="0.05 0.5" pos="-0.65 0.55 -0.45" euler="15 15 0" />
+              <geom name="lf_crossbar_visu" class="foot_visual" type="capsule" size="0.07 0.8" pos="0.0 0.68 -0.95" euler="0 90 0" />
+              <geom name="lf_joint_visu" class="foot_visual" type="capsule" size="0.05 0.54" pos="0.0 0.435 0.0" euler="0 90 0" />
+              <geom name="lf_collision" class="drone_collision" fluidshape="ellipsoid" fluidcoef="0 0 0 0 0" size="0.08 0.85 0.6" pos="0.0 0.55 -0.45" euler="15 0 90" mass="0.3" rgba="0 1 1 1" />
+            </body>
+            <body name="right_foot" euler="-90 -90 0">
+              <joint name="rf_joint" type="hinge" axis="-1 0 0" pos="0.0 -0.45 0.0" range="0 75" />
+              <geom name="rf_v1_visu" class="foot_visual" size="0.05 0.5" pos="0.65 -0.55 -0.45" euler="-15 -15 0" />
+              <geom name="rf_v2_visu" class="foot_visual" size="0.05 0.5" pos="-0.65 -0.55 -0.45" euler="-15 15 0" />
+              <geom name="rf_crossbar_visu" class="foot_visual" type="capsule" size="0.07 0.8" pos="0.0 -0.68 -0.95" euler="0 90 0" />
+              <geom name="rf_joint_visu" class="foot_visual" type="capsule" size="0.05 0.54" pos="0.0 -0.435 0.0" euler="0 90 0" />
+              <geom name="rf_collision" class="drone_collision" fluidshape="ellipsoid" fluidcoef="0 0 0 0 0" size="0.08 0.85 0.6" pos="0.0 -0.55 -0.45" euler="-15 0 90" mass="0.3" rgba="0 1 1 1" />
+            </body>
+        </body>
+      </body>
+    </body> 
+
+    <body name="bar" pos="8.75 0.0 4.21" euler="0 0 90">
+      <freejoint name="bar"/>
+      <geom type="capsule" size="0.02 0.25" fluidshape="ellipsoid" fluidcoef="0 0 0 0 0" rgba="0 1 0 1" euler="0 90 0" pos="0.0 0.0 0.0" mass="0.2" />
+      <site name="site_left_bar" type="sphere" size="0.005" rgba="1 0 0 1" pos="0.25 0.0 0.0" />
+      <site name="site_right_bar" type="sphere" size="0.005" rgba="1 0 0 1" pos="-0.25 0.0 0.0" />
+      <site name="site_center_bar" type="sphere" size="0.005" pos="0.0 0.0 0.0" />
+    </body>
+  </worldbody>
+
+  <equality>
+    <weld name="left_cable_bar" site1="left_S_last" site2="site_left_bar" />
+    <weld name="right_cable_bar" site1="right_S_last" site2="site_right_bar" />
+  </equality>
+  <contact>
+    <exclude body1="left_B_last" body2="bar" />
+    <exclude body1="left_B_77" body2="bar" />
+    <exclude body1="right_B_last" body2="bar" />
+    <exclude body1="right_B_77" body2="bar" />
+    <exclude body1="left_B_first" body2="platform_cables" />
+    <exclude body1="left_B_2" body2="platform_cables" />
+    <exclude body1="right_B_first" body2="platform_cables" />
+    <exclude body1="right_B_2" body2="platform_cables" />
+  </contact>
+
+  <actuator>
+    <motor class="x2" name="thrust1" site="thrust1" gear="0 0 1 0 0 -.201"/>
+    <motor class="x2" name="thrust2" site="thrust2" gear="0 0 1 0 0  .201"/>
+    <motor class="x2" name="thrust3" site="thrust3" gear="0 0 1 0 0  -.201"/>
+    <motor class="x2" name="thrust4" site="thrust4" gear="0 0 1 0 0  .201"/>
+
+    <position name="right foot" joint="rf_joint" ctrlrange="0 75" kp="5" kv="50"/>
+    <position name="left foot" joint="lf_joint" ctrlrange="0 75" kp="5" kv="50"/>
+
+    <!-- <position name="x bar" joint="bar" gear="1 0 0 0 0 0" kp="1" />
+    <position name="y bar" joint="bar" gear="0 1 0 0 0 0" kp="1" />
+    <position name="z bar" joint="bar" gear="0 0 1 0 0 0" kp="1" /> -->
+
+  </actuator>
+  <sensor>
+    <gyro name="body_gyro" site="imu" />
+    <accelerometer name="body_linacc" site="imu" />
+    <framequat name="body_quat" objtype="site" objname="imu" />
+    <subtreecom name="drone_load_com" body="x2" />
+  </sensor>
+</mujoco>

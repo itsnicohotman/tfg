@@ -1,0 +1,15 @@
+<mujoco>
+<compiler meshdir="/home/nicolas/tfg_viejo/mujoco/assets/dualarm/meshes/"/>
+<!-- <option integrator="implicit" timestep="0.0005" iterations="100" density="1.204" viscosity="1.8e-5" gravity="0 0 -9.81"/>
+ -->
+ <option integrator="implicit" timestep="0.008" density="1.204" viscosity="1.48e-5"/>
+<include file="scene.xml"/>
+<include file="dualarm/robot.xml"/>
+<include file="drone/drone.xml"/>
+
+<worldbody>
+    <geom name="drone_landing_box" pos="9 0 1" type="box" size="2 2 1"/>
+    <geom name="robot_pick_up_area" pos="0 10 0.05" type="cylinder" size="2 0.05" rgba="0 1 0 1"/>
+    <geom name="robot_drop_off_area" pos="-7 -10 0.05" type="cylinder" size="2 0.05" rgba="0.7 0 0.9 1"/>
+</worldbody>
+</mujoco>

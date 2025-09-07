@@ -1,0 +1,39 @@
+	 Informe de propiedades físicas	 Part: C:\Users\nicol\Desktop\Nicolás\UNIVERSIDAD\5\C2\TFG\Modelo 3D\Piezas editables\Dual Arm Manipulator\Arm with shoulder\Arm\LINK_Claw_Upper.par		 3/21/2025   5:1 Pm
+
+	 densidad= 2712,000000 	 kg/m^3    
+
+	       volumen= 7340,474036 	 mm^3    
+	         masa= 0,019907 	 kg    
+	 Área de la superficie= 4788,044275 	 mm^2    
+
+	 Respecto al Base :
+
+	 Centro de masa :
+		 X= -12,870715 	 mm    
+		 Y= 16,568305 	 mm    
+		 Z= 0,980863 	 mm    
+
+	 Centro de volumen :
+		 X= -12,870715 	 mm    
+		 Y= 16,568305 	 mm    
+		 Z= 0,980863 	 mm    
+
+	 Momentos de inercia de la masa :
+		 Ixx= 0,000016 	 kg-m^2    	 Iyy= 0,000005 	 kg-m^2    	 Izz= 0,000020 kg-m^2    
+		 Ixy= -0,000004 	 kg-m^2    	 Ixz= -0,000000 	 kg-m^2    	 Iyz= 0,000001 	 kg-m^2    
+
+	 Orientación de ejes principales :
+		 X= 0,005767 	-0,084247 	0,996428 	
+		 Y= 0,999910 	-0,011622 	-0,006769 	
+		 Z= 0,012150 	0,996377 	0,084173 	
+
+	 Respecto a los ejes principales :
+
+	 Momentos de inercia principales :
+		 I1= 0,000011 	 kg-m^2    	 I2= 0,000011 	 kg-m^2    	 I3= 0,000001 	 kg-m^2    
+
+	 Radios de giro :
+		 Rx= 24,026802 	 mm    
+		 Ry= 23,505230 	 mm    
+		 Rz= 7,593773 	 mm    
+

@@ -1,0 +1,42 @@
+<mujoco>
+<compiler meshdir="/home/nicolas/tfg/mujoco/assets/dualarm/meshes/"/>
+
+    <default>
+        <mesh scale="0.01 0.01 0.01"/>
+        <default class="visual_servo">
+            <geom material="servo_material" type="mesh" contype="0" conaffinity="0" group="2"/>
+        </default>
+        <default class="visual_link">
+            <geom material="link_material" type="mesh" contype="0" conaffinity="0" group="2"/>
+        </default>
+        <default class="collision">
+            <geom group="4"/>
+        </default>
+        <default class="collision_test">
+            <geom material="collision_material" type="mesh" group="5" contype="0" conaffinity="0"/>
+        </default>
+    </default>
+
+    <asset>
+        <mesh name="base_mesh" file="base.obj" />
+        <mesh name="upper_arm_mesh" file="upper_arm.obj"/>
+        <mesh name="forearm_mesh" file="forearm.obj"/>
+        <mesh name="claw_mesh" file="claw.obj"/>
+        <mesh name="claw_under_left_mesh" file="claw_under_right.obj"/>
+        <mesh name="claw_under_right_mesh" file="claw_under_left.obj"/>
+        <mesh name="claw_upper_left_mesh" file="claw_upper.obj"/>
+        <mesh name="claw_upper_right_mesh" file="claw_upper_right.obj"/>
+        <mesh name="elbow_pitch_mesh" file="elbow_pitch.obj"/>
+        <mesh name="shoulder_pitch_mesh" file="shoulder_pitch.obj"/>
+        <mesh name="shoulder_yaw_mesh" file="shoulder_yaw.obj"/>
+        <mesh name="shoulder_roll_mesh" file="shoulder_roll.obj"/>
+        <mesh name="transmission_frame_shoulder_pitch_mesh" file="transmission_frame_shoulder_pitch.obj"/>
+        <mesh name="transmission_frame_shoulder_pitch_fix_mesh" file="transmission_frame_shoulder_pitch_2.obj"/>
+        <mesh name="transmission_frame_shoulder_yaw_roll_mesh" file="transmission_frame_shoulder_yaw_roll.obj"/>
+
+        <material name="link_material" rgba="0.82 0.82 0.82 1" specular="0" shininess="20" metallic="1"/>
+        <material name="servo_material" rgba="1 0 0 1" specular="0" shininess="20"/>
+        <material name="collision_material" rgba="0 0 1 1" specular="0" shininess="20"/>
+    </asset>
+
+</mujoco>

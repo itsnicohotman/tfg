@@ -1,0 +1,39 @@
+	 Informe de propiedades físicas	 Part: C:\Users\nicol\Desktop\Nicolás\UNIVERSIDAD\5\C2\TFG\Modelo 3D\Piezas editables\Dual Arm Manipulator\Arm with shoulder\Transmission_Frame_Shoulder_Pitch_2.par		 3/21/2025   4:28 Pm
+
+	 densidad= 2712,000000 	 kg/m^3    
+
+	       volumen= 2520,000000 	 mm^3    
+	         masa= 0,006834 	 kg    
+	 Área de la superficie= 3064,000000 	 mm^2    
+
+	 Respecto al Sistema de coordenadas global :
+
+	 Centro de masa :
+		 X= -0,000000 	 mm    
+		 Y= 6,714286 	 mm    
+		 Z= 0,000000 	 mm    
+
+	 Centro de volumen :
+		 X= -0,000000 	 mm    
+		 Y= 6,714286 	 mm    
+		 Z= 0,000000 	 mm    
+
+	 Momentos de inercia de la masa :
+		 Ixx= 0,000001 	 kg-m^2    	 Iyy= 0,000001 	 kg-m^2    	 Izz= 0,000001 kg-m^2    
+		 Ixy= -0,000000 	 kg-m^2    	 Ixz= -0,000000 	 kg-m^2    	 Iyz= 0,000000 	 kg-m^2    
+
+	 Orientación de ejes principales :
+		 X= 0,000000 	1,000000 	0,000000 	
+		 Y= 0,000000 	0,000000 	1,000000 	
+		 Z= 1,000000 	0,000000 	0,000000 	
+
+	 Respecto a los ejes principales :
+
+	 Momentos de inercia principales :
+		 I1= 0,000001 	 kg-m^2    	 I2= 0,000001 	 kg-m^2    	 I3= 0,000001 	 kg-m^2    
+
+	 Radios de giro :
+		 Rx= 13,568170 	 mm    
+		 Ry= 12,536206 	 mm    
+		 Rz= 10,347039 	 mm    
+
